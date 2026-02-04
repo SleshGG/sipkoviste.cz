@@ -8,8 +8,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 // --- INTERFACES ---
 export interface Product {
   id: string
-  name: string // Tady pozor, některé komponenty mohou hledat 'title'
-  title?: string // Přidáme volitelně pro kompatibilitu
+  name: string
+  title?: string // Pro zpětnou kompatibilitu s komponentami hledajícími 'title'
   brand: string
   price: number
   weight: string
@@ -22,6 +22,7 @@ export interface Product {
   specs?: Record<string, string>
   seller?: Seller
   createdAt: string
+  negotiable?: boolean
 }
 
 export interface Seller {
@@ -34,7 +35,7 @@ export interface Seller {
   responseTime: string
 }
 
-// --- STATICKÉ KONSTANTY (Pro filtry a tvůj formulář) ---
+// --- STATICKÉ KONSTANTY ---
 export const categories = [
   { id: 'steel-darts', name: 'Ocelové šipky', icon: 'target', count: 0 },
   { id: 'soft-darts', name: 'Softové šipky', icon: 'circle-dot', count: 0 },
@@ -47,8 +48,7 @@ export const materials = ['90% Wolfram', '95% Wolfram', '97% Wolfram', '80% Wolf
 export const conditions = ['Nové', 'Jako nové', 'Dobré', 'Uspokojivé']
 export const weights = ['16g', '18g', '20g', '21g', '22g', '23g', '24g', '25g', '26g', '28g', '30g']
 
-// --- MOCK DATA (Fix pro tvou chybu při buildu) ---
-// Exportujeme mockProducts, které hledá Dashboard a Marketplace
+// --- MOCK DATA (Fix pro Vercel build error) ---
 export const mockProducts: Product[] = [
   {
     id: '1',
@@ -64,26 +64,10 @@ export const mockProducts: Product[] = [
     images: ['/placeholder.svg'],
     description: 'Špičkové šipky německého obra.',
     createdAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    name: 'Winmau Blade 6 Dual Core',
-    title: 'Winmau Blade 6 Dual Core',
-    brand: 'Winmau',
-    price: 1890,
-    weight: '-',
-    material: 'Sisal',
-    condition: 'Nové',
-    category: 'dartboards',
-    image: '/placeholder.svg',
-    images: ['/placeholder.svg'],
-    description: 'Nejpoužívanější terč na světě.',
-    createdAt: new Date().toISOString(),
   }
 ]
 
 // --- DATABÁZOVÉ FUNKCE ---
-
 export async function getProducts() {
   const { data, error } = await supabase
     .from('products')
@@ -91,14 +75,13 @@ export async function getProducts() {
     .order('created_at', { ascending: false })
 
   if (error || !data || data.length === 0) {
-    console.warn('Vracím mock data, protože DB je prázdná nebo nedostupná.')
-    return mockProducts // Vrátíme mock data, aby aplikace nespadla
+    return mockProducts
   }
 
   return data.map(item => ({
     ...item,
     createdAt: item.created_at,
-    title: item.name // Zajištění kompatibility
+    title: item.name
   })) as Product[]
 }
 
@@ -110,7 +93,6 @@ export async function getProductById(id: string) {
     .single()
 
   if (error) {
-    // Pokud nenajdeme v DB, zkusíme v mocku (pro demo účely)
     return mockProducts.find(p => p.id === id) || null
   }
 
