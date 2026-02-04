@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react' // Přidán useEffect
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Header } from '@/components/header'
@@ -22,8 +22,9 @@ import {
   Truck,
   MessageCircle,
   Star,
+  Loader2, // Ikona pro načítání
 } from 'lucide-react'
-import { mockProducts, categories } from '@/lib/data'
+import { categories, getProducts, Product } from '@/lib/data' // Importujeme getProducts a typ
 import HeroBanner from '@/components/hero-banner'
 import TextBanner from '@/components/text-banner'
 
@@ -59,7 +60,23 @@ const features = [
 
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState('')
-  const featuredProducts = mockProducts.slice(0, 4)
+  const [products, setProducts] = useState<Product[]>([]) // Stav pro produkty
+  const [isLoading, setIsLoading] = useState(true) // Stav pro načítání
+
+  // NAČÍTÁNÍ DAT ZE SUPABASE
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const data = await getProducts()
+        setProducts(data.slice(0, 4)) // Vezmeme první 4 pro "Doporučené"
+      } catch (error) {
+        console.error("Nepodařilo se načíst produkty:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadData()
+  }, [])
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
@@ -163,9 +180,6 @@ export default function HomePage() {
                           <h3 className="font-semibold text-xs sm:text-base mb-0.5 sm:mb-1 group-hover:text-primary transition-colors">
                             {category.name}
                           </h3>
-                          <p className="text-[10px] sm:text-sm text-muted-foreground">
-                            {category.count.toLocaleString('cs-CZ')} inzerátů
-                          </p>
                         </div>
                       </div>
                     </Card>
@@ -177,7 +191,7 @@ export default function HomePage() {
         </motion.div>
       </section>
 
-      {/* Featured Products */}
+      {/* Featured Products - Tady se děje to hlavní */}
       <section className="container mx-auto px-3 sm:px-4 py-8 sm:py-12 md:py-16">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -197,15 +211,29 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-6">
-            {featuredProducts.map((product, index) => (
-              <ProductCard key={product.id} product={product} index={index} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 w-full">
+              <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
+              <p className="text-muted-foreground">Načítám šipky z tržiště...</p>
+            </div>
+          ) : products.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-6">
+              {products.map((product, index) => (
+                <ProductCard key={product.id} product={product} index={index} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20 border-2 border-dashed rounded-xl">
+              <p className="text-muted-foreground">Zatím tu nejsou žádné inzeráty. Buďte první!</p>
+              <Link href="/sell" className="mt-4 inline-block">
+                <Button variant="outline">Vložit inzerát</Button>
+              </Link>
+            </div>
+          )}
         </motion.div>
       </section>
 
-      {/* Features */}
+      {/* Features - ponecháno beze změny */}
       <section className="border-t border-border bg-secondary/30">
         <div className="container mx-auto px-4 py-12 md:py-16">
           <motion.div
@@ -271,7 +299,6 @@ export default function HomePage() {
         </motion.div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t border-border bg-card">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -285,15 +312,9 @@ export default function HomePage() {
               </span>
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <Link href="#" className="hover:text-foreground transition-colors">
-                Podmínky
-              </Link>
-              <Link href="#" className="hover:text-foreground transition-colors">
-                Soukromí
-              </Link>
-              <Link href="#" className="hover:text-foreground transition-colors">
-                Podpora
-              </Link>
+              <Link href="#" className="hover:text-foreground transition-colors">Podmínky</Link>
+              <Link href="#" className="hover:text-foreground transition-colors">Soukromí</Link>
+              <Link href="#" className="hover:text-foreground transition-colors">Podpora</Link>
             </div>
           </div>
         </div>
