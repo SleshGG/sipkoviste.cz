@@ -279,7 +279,7 @@ export default function HomePage() {
               <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
                 <Target className="h-4 w-4 text-primary-foreground" />
               </div>
-              <span className="font-bold">Bazar</span>
+              <span className="font-bold">Šipkoviště.cz</span>
               <span className="text-muted-foreground text-sm">
                 © 2026 Všechna práva vyhrazena
               </span>

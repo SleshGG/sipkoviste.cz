@@ -115,7 +115,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                   </div>
                 </div>
                 <DialogHeader>
-                  <DialogTitle className="text-xl sm:text-2xl">Vitejte v Bazar Sipky</DialogTitle>
+                  <DialogTitle className="text-xl sm:text-2xl">Vitejte v Šipkoviště.cz</DialogTitle>
                   <DialogDescription className="text-sm">
                     Prihlaste se nebo si vytvorte ucet pro pristup k trzisti
                   </DialogDescription>
