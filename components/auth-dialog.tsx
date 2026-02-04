@@ -96,7 +96,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               </h3>
               <p className="text-sm text-muted-foreground text-center">
                 {activeTab === 'login'
-                  ? 'Vitejte zpet v Bazar Sipky'
+                  ? 'Vitejte zpet v Šipkoviště.cz'
                   : 'Nyni se muzete prihlasit'}
               </p>
             </motion.div>
