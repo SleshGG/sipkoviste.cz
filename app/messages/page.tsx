@@ -25,12 +25,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { mockMessages } from '@/lib/data'
+// mockMessages byl odstraněn, protože v lib/data.ts již neexistuje
+import { mockProducts } from '@/lib/data'
 
 function MessagesContent() {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
-  const [messages] = useState(mockMessages)
+  // Nastaveno na prázdné pole, dokud nepropojíme zprávy se Supabase
+  const [messages] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
 
   const filteredMessages = messages.filter(
@@ -93,11 +95,10 @@ function MessagesContent() {
                       <button
                         key={msg.id}
                         onClick={() => setSelectedConversation(msg.id)}
-                        className={`w-full p-3 sm:p-4 text-left border-b border-border hover:bg-secondary/50 transition-colors ${
-                          selectedConversation === msg.id
+                        className={`w-full p-3 sm:p-4 text-left border-b border-border hover:bg-secondary/50 transition-colors ${selectedConversation === msg.id
                             ? 'bg-secondary/80 border-l-2 border-l-primary'
                             : ''
-                        }`}
+                          }`}
                       >
                         <div className="flex gap-2.5 sm:gap-3">
                           <div className="relative shrink-0">
@@ -139,7 +140,7 @@ function MessagesContent() {
                   ) : (
                     <div className="flex-1 flex items-center justify-center text-center p-8">
                       <div>
-                        <p className="text-muted-foreground">Žádné konverzace nenalezeny</p>
+                        <p className="text-muted-foreground text-sm">Zatím nemáte žádné zprávy.</p>
                       </div>
                     </div>
                   )}
@@ -152,177 +153,4 @@ function MessagesContent() {
               >
                 {selectedMessage ? (
                   <>
-                    {/* Chat Header */}
-                    <div className="p-3 sm:p-4 border-b border-border shrink-0 bg-secondary/30">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <button
-                          onClick={() => setSelectedConversation(null)}
-                          className="md:hidden p-1.5 sm:p-2 -ml-1 hover:bg-secondary rounded-lg shrink-0"
-                        >
-                          <ChevronLeft className="h-5 w-5" />
-                        </button>
-                        <div className="relative h-8 w-8 sm:h-10 sm:w-10 rounded-full overflow-hidden bg-secondary shrink-0">
-                          <Image
-                            src={selectedMessage.senderAvatar || '/placeholder.svg'}
-                            alt={selectedMessage.senderName}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-sm sm:text-base truncate">{selectedMessage.senderName}</h3>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                            {selectedMessage.productName}
-                          </p>
-                        </div>
-                        <Link href={`/product/${selectedMessage.productId}`} className="shrink-0 hidden xs:block">
-                          <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-secondary border border-border hover:border-primary transition-colors">
-                            <Image
-                              src={selectedMessage.productImage || '/placeholder.svg'}
-                              alt={selectedMessage.productName}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                        </Link>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="gap-2">
-                              <Archive className="h-4 w-4" />
-                              Archivovat
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2">
-                              <Flag className="h-4 w-4" />
-                              Nahlásit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2 text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                              Smazat konverzaci
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-
-                    {/* Messages Area */}
-                    <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-background/50">
-                      <div className="space-y-3 sm:space-y-4 max-w-3xl mx-auto">
-                        {/* Date Separator */}
-                        <div className="flex items-center gap-3 sm:gap-4 my-3 sm:my-4">
-                          <div className="flex-1 h-px bg-border" />
-                          <span className="text-[10px] sm:text-xs text-muted-foreground px-2">Dnes</span>
-                          <div className="flex-1 h-px bg-border" />
-                        </div>
-
-                        {/* Incoming Message */}
-                        <div className="flex gap-2 sm:gap-3">
-                          <div className="relative h-7 w-7 sm:h-8 sm:w-8 rounded-full overflow-hidden bg-secondary shrink-0">
-                            <Image
-                              src={selectedMessage.senderAvatar || '/placeholder.svg'}
-                              alt={selectedMessage.senderName}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="space-y-1 max-w-[80%] sm:max-w-[75%]">
-                            <div className="bg-secondary rounded-2xl rounded-tl-sm px-3 sm:px-4 py-2 sm:py-2.5">
-                              <p className="text-xs sm:text-sm">{selectedMessage.lastMessage}</p>
-                            </div>
-                            <span className="text-[10px] sm:text-xs text-muted-foreground ml-2">
-                              {selectedMessage.timestamp}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Outgoing Message Example */}
-                        <div className="flex gap-2 sm:gap-3 justify-end">
-                          <div className="space-y-1 max-w-[80%] sm:max-w-[75%]">
-                            <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3 sm:px-4 py-2 sm:py-2.5">
-                              <p className="text-xs sm:text-sm">
-                                Dobrý den, děkuji za zájem! Ano, šipky jsou stále dostupné.
-                              </p>
-                            </div>
-                            <span className="text-[10px] sm:text-xs text-muted-foreground mr-2 text-right block">
-                              Před 5 minutami
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Another Incoming Message */}
-                        <div className="flex gap-2 sm:gap-3">
-                          <div className="relative h-7 w-7 sm:h-8 sm:w-8 rounded-full overflow-hidden bg-secondary shrink-0">
-                            <Image
-                              src={selectedMessage.senderAvatar || '/placeholder.svg'}
-                              alt={selectedMessage.senderName}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="space-y-1 max-w-[80%] sm:max-w-[75%]">
-                            <div className="bg-secondary rounded-2xl rounded-tl-sm px-3 sm:px-4 py-2 sm:py-2.5">
-                              <p className="text-xs sm:text-sm">
-                                Super! Bylo by možné se domluvit na osobním předání v Praze?
-                              </p>
-                            </div>
-                            <span className="text-[10px] sm:text-xs text-muted-foreground ml-2">Právě teď</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Message Input */}
-                    <div className="p-2 sm:p-4 border-t border-border shrink-0 bg-card">
-                      <div className="flex gap-2 sm:gap-3 max-w-3xl mx-auto">
-                        <Input
-                          placeholder="Napište zprávu..."
-                          value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newMessage.trim()) {
-                              setNewMessage('')
-                            }
-                          }}
-                          className="flex-1 bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-primary text-sm"
-                        />
-                        <Button size="icon" disabled={!newMessage.trim()} className="shrink-0 h-9 w-9 sm:h-10 sm:w-10">
-                          <Send className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-center p-8 bg-background/50">
-                    <div>
-                      <div className="h-20 w-20 mx-auto mb-4 rounded-full bg-secondary flex items-center justify-center">
-                        <MessageCircle className="h-10 w-10 text-muted-foreground" />
-                      </div>
-                      <h3 className="text-lg font-semibold mb-2">Vyberte konverzaci</h3>
-                      <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                        Vyberte konverzaci ze seznamu vlevo pro zobrazení zpráv
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-      </main>
-
-      <MobileNav />
-    </div>
-  )
-}
-
-export default function MessagesPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-background" />}>
-      <MessagesContent />
-    </Suspense>
-  )
-}
+                    {/*
