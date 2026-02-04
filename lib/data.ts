@@ -9,13 +9,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 export interface Product {
   id: string
   name: string
-  title?: string // Pro zpětnou kompatibilitu s komponentami hledajícími 'title'
+  title?: string
   brand: string
   price: number
   weight: string
   material: string
-  condition: string
-  category: string
+  condition: 'Nové' | 'Jako nové' | 'Dobré' | 'Uspokojivé'
+  category: 'steel-darts' | 'soft-darts' | 'dartboards' | 'accessories'
   image: string
   images: string[]
   description: string
@@ -35,7 +35,7 @@ export interface Seller {
   responseTime: string
 }
 
-// --- STATICKÉ KONSTANTY ---
+// --- STATICKÉ KONSTANTY (Musí přesně sedět na SQL CHECK constraints!) ---
 export const categories = [
   { id: 'steel-darts', name: 'Ocelové šipky', icon: 'target', count: 0 },
   { id: 'soft-darts', name: 'Softové šipky', icon: 'circle-dot', count: 0 },
@@ -45,10 +45,13 @@ export const categories = [
 
 export const brands = ['Target', 'Winmau', 'Unicorn', 'Harrows', 'Red Dragon', 'Shot', 'Cosmo', 'L-Style', 'Mission', 'Datadart']
 export const materials = ['90% Wolfram', '95% Wolfram', '97% Wolfram', '80% Wolfram', 'Mosaz', 'Niklové stříbro']
-export const conditions = ['Nové', 'Jako nové', 'Dobré', 'Uspokojivé']
+
+// TATO POLE MUSÍ SEDĚT NA SQL CHECK CONSTRAINT
+export const conditions = ['Nové', 'Jako nové', 'Dobré', 'Uspokojivé'] as const;
+
 export const weights = ['16g', '18g', '20g', '21g', '22g', '23g', '24g', '25g', '26g', '28g', '30g']
 
-// --- MOCK DATA (Fix pro Vercel build error) ---
+// --- MOCK DATA PRO BUILD ---
 export const mockProducts: Product[] = [
   {
     id: '1',
@@ -62,7 +65,7 @@ export const mockProducts: Product[] = [
     category: 'steel-darts',
     image: '/placeholder.svg',
     images: ['/placeholder.svg'],
-    description: 'Špičkové šipky německého obra.',
+    description: 'Špičkové šipky.',
     createdAt: new Date().toISOString(),
   }
 ]
@@ -74,9 +77,7 @@ export async function getProducts() {
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (error || !data || data.length === 0) {
-    return mockProducts
-  }
+  if (error || !data || data.length === 0) return mockProducts
 
   return data.map(item => ({
     ...item,
@@ -86,29 +87,18 @@ export async function getProducts() {
 }
 
 export async function getProductById(id: string) {
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error) {
-    return mockProducts.find(p => p.id === id) || null
-  }
-
-  return { ...data, createdAt: data.created_at, title: data.name } as Product
+  const { data, error } = await supabase.from('products').select('*').eq('id', id).single()
+  if (error) return mockProducts.find(p => p.id === id) || null
+  return { ...data, createdAt: data.current_at, title: data.name } as Product
 }
 
 export async function getUserMessages() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return []
-
   const { data, error } = await supabase
     .from('messages')
     .select('*, products(name, image)')
     .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
     .order('created_at', { ascending: false })
-
-  if (error) return []
-  return data
+  return error ? [] : data
 }
