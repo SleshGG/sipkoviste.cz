@@ -8,7 +8,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Bazar - Tržiště s Šipkami',
+  title: 'Šipkoviště.cz - Tržiště s Šipkami',
   description: 'Kupujte a prodávejte prémiové šipky, terče a příslušenství. Největší tržiště pro milovníky šipek v ČR.',
   generator: 'v0.app',
   icons: {
