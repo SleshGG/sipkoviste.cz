@@ -34,9 +34,12 @@ import {
   Flag,
   Loader2,
 } from 'lucide-react'
-import type { Product } from '@/lib/data'
+import type { Product as MockProduct } from '@/lib/data'
+import type { ProductWithSeller } from '@/lib/supabase/types'
 import { createClient } from '@/lib/supabase/client'
 import { sendMessageAction } from '@/lib/supabase/actions'
+
+type Product = ProductWithSeller | MockProduct
 
 const safetyTips = [
   'Při osobním předání se setkejte na veřejném místě',
