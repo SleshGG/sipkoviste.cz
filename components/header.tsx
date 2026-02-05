@@ -32,43 +32,67 @@ export function Header() {
 
   useEffect(() => {
     const supabase = createClient()
+    let isMounted = true
 
-    // Get initial session
-    supabase.auth.getUser().then(({ data: { user }, error }) => {
-      console.log('[v0] Header getUser:', user?.email, 'error:', error?.message)
-      setUser(user)
-      if (user) {
-        // Fetch profile
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-          .then(({ data, error: profileError }) => {
-            console.log('[v0] Profile fetch:', data?.name, 'error:', profileError?.message)
-            setProfile(data)
-          })
+    const fetchUserAndProfile = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        console.log('[v0] Header getUser:', user?.email, 'error:', error?.message)
+        
+        if (!isMounted) return
+        
+        setUser(user)
+        
+        if (user) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single()
+          
+          if (isMounted) {
+            console.log('[v0] Profile fetch:', profileData?.name)
+            setProfile(profileData)
+          }
+        }
+      } catch (err) {
+        console.log('[v0] Auth error:', err)
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
       }
-      setIsLoading(false)
-    })
+    }
+
+    fetchUserAndProfile()
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[v0] Auth state changed:', event, session?.user?.email)
+      
+      if (!isMounted) return
+      
       setUser(session?.user ?? null)
+      setIsLoading(false)
+      
       if (session?.user) {
         const { data } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
           .single()
-        setProfile(data)
+        if (isMounted) {
+          setProfile(data)
+        }
       } else {
         setProfile(null)
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const handleSignOut = async () => {
