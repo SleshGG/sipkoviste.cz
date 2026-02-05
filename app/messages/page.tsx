@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -18,6 +18,8 @@ import {
   Trash2,
   Archive,
   Flag,
+  Loader2,
+  User,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -25,23 +27,238 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { createClient } from '@/lib/supabase/client'
+import { sendMessageAction, markMessagesAsReadAction } from '@/lib/supabase/actions'
 import { mockMessages } from '@/lib/data'
+
+interface Conversation {
+  id: string
+  participant: {
+    id: string
+    name: string | null
+    avatar_url: string | null
+  }
+  product: {
+    id: string
+    name: string
+    image: string | null
+  }
+  lastMessage: string
+  timestamp: string
+  unread: boolean
+}
+
+interface Message {
+  id: string
+  sender_id: string
+  receiver_id: string
+  product_id: string
+  text: string
+  is_read: boolean
+  created_at: string
+}
+
+function formatTimestamp(date: string) {
+  const now = new Date()
+  const messageDate = new Date(date)
+  const diffMs = now.getTime() - messageDate.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'Prave ted'
+  if (diffMins < 60) return `pred ${diffMins} min`
+  if (diffHours < 24) return `pred ${diffHours} hod`
+  if (diffDays < 7) return `pred ${diffDays} dny`
+  return messageDate.toLocaleDateString('cs-CZ')
+}
 
 function MessagesContent() {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
-  const [messages] = useState(mockMessages)
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [messages, setMessages] = useState<Message[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSending, setIsSending] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
-  const filteredMessages = messages.filter(
-    (msg) =>
-      msg.senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      msg.productName.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    const supabase = createClient()
+    
+    // Get current user and fetch conversations
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) {
+        setIsLoading(false)
+        return
+      }
+      
+      setCurrentUserId(user.id)
+      
+      // Fetch conversations
+      const { data: messagesData, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:profiles!messages_sender_id_fkey (
+            id,
+            name,
+            avatar_url
+          ),
+          receiver:profiles!messages_receiver_id_fkey (
+            id,
+            name,
+            avatar_url
+          ),
+          product:products!messages_product_id_fkey (
+            id,
+            name,
+            image
+          )
+        `)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching conversations:', error)
+        // Fallback to mock data
+        setConversations(mockMessages.map(m => ({
+          id: m.id,
+          participant: {
+            id: m.senderId,
+            name: m.senderName,
+            avatar_url: m.senderAvatar,
+          },
+          product: {
+            id: m.productId,
+            name: m.productName,
+            image: m.productImage,
+          },
+          lastMessage: m.lastMessage,
+          timestamp: m.timestamp,
+          unread: m.unread,
+        })))
+        setIsLoading(false)
+        return
+      }
+
+      // Group by conversation
+      const conversationsMap = new Map<string, Conversation>()
+      
+      messagesData?.forEach((msg: any) => {
+        const otherUserId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id
+        const otherUser = msg.sender_id === user.id ? msg.receiver : msg.sender
+        const key = `${otherUserId}-${msg.product_id}`
+        
+        if (!conversationsMap.has(key)) {
+          conversationsMap.set(key, {
+            id: key,
+            participant: otherUser,
+            product: msg.product,
+            lastMessage: msg.text,
+            timestamp: msg.created_at,
+            unread: !msg.is_read && msg.receiver_id === user.id
+          })
+        }
+      })
+
+      setConversations(Array.from(conversationsMap.values()))
+      setIsLoading(false)
+    })
+  }, [])
+
+  const selectedConv = conversations.find(c => c.id === selectedConversation)
+
+  // Fetch messages for selected conversation
+  useEffect(() => {
+    if (!selectedConversation || !currentUserId) return
+
+    const [otherUserId, productId] = selectedConversation.split('-')
+    const supabase = createClient()
+
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('product_id', productId)
+        .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${currentUserId})`)
+        .order('created_at', { ascending: true })
+
+      if (!error && data) {
+        setMessages(data)
+        // Mark as read
+        markMessagesAsReadAction(otherUserId, productId)
+      }
+    }
+
+    fetchMessages()
+
+    // Subscribe to new messages
+    const channel = supabase
+      .channel('messages')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `product_id=eq.${productId}`,
+      }, (payload) => {
+        setMessages(prev => [...prev, payload.new as Message])
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedConversation, currentUserId])
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedConv || !currentUserId) return
+
+    setIsSending(true)
+    const [otherUserId, productId] = selectedConversation!.split('-')
+
+    const result = await sendMessageAction({
+      receiver_id: otherUserId,
+      product_id: productId,
+      text: newMessage.trim(),
+    })
+
+    setIsSending(false)
+
+    if (!result.error) {
+      setNewMessage('')
+    }
+  }
+
+  const filteredConversations = conversations.filter(
+    (conv) =>
+      conv.participant.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      conv.product.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const selectedMessage = selectedConversation
-    ? messages.find((m) => m.id === selectedConversation)
-    : null
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!currentUserId) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-0">
+        <Header />
+        <main className="container mx-auto px-4 py-16 text-center">
+          <div className="h-20 w-20 mx-auto mb-4 rounded-full bg-secondary flex items-center justify-center">
+            <MessageCircle className="h-10 w-10 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Prihlaste se pro zobrazeni zprav</h2>
+          <p className="text-muted-foreground">Pro pristup ke zpravam se musite nejprve prihlasit</p>
+        </main>
+        <MobileNav />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
@@ -55,9 +272,9 @@ function MessagesContent() {
           transition={{ duration: 0.3 }}
           className="mb-4 sm:mb-6 px-2 sm:px-0"
         >
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-1">Zprávy</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-1">Zpravy</h1>
           <p className="text-sm sm:text-base text-muted-foreground">
-            {messages.filter((m) => m.unread).length} nepřečtených zpráv
+            {conversations.filter((c) => c.unread).length} neprectenych zprav
           </p>
         </motion.div>
 
@@ -78,7 +295,7 @@ function MessagesContent() {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Hledat v konverzacích..."
+                      placeholder="Hledat v konverzacich..."
                       className="pl-10 bg-secondary border-0 text-sm"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -88,13 +305,13 @@ function MessagesContent() {
 
                 {/* Conversations List */}
                 <div className="flex-1 overflow-y-auto">
-                  {filteredMessages.length > 0 ? (
-                    filteredMessages.map((msg) => (
+                  {filteredConversations.length > 0 ? (
+                    filteredConversations.map((conv) => (
                       <button
-                        key={msg.id}
-                        onClick={() => setSelectedConversation(msg.id)}
+                        key={conv.id}
+                        onClick={() => setSelectedConversation(conv.id)}
                         className={`w-full p-3 sm:p-4 text-left border-b border-border hover:bg-secondary/50 transition-colors ${
-                          selectedConversation === msg.id
+                          selectedConversation === conv.id
                             ? 'bg-secondary/80 border-l-2 border-l-primary'
                             : ''
                         }`}
@@ -102,35 +319,41 @@ function MessagesContent() {
                         <div className="flex gap-2.5 sm:gap-3">
                           <div className="relative shrink-0">
                             <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-full overflow-hidden bg-secondary">
-                              <Image
-                                src={msg.senderAvatar || '/placeholder.svg'}
-                                alt={msg.senderName}
-                                fill
-                                className="object-cover"
-                              />
+                              {conv.participant.avatar_url ? (
+                                <Image
+                                  src={conv.participant.avatar_url}
+                                  alt={conv.participant.name || 'User'}
+                                  fill
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center">
+                                  <User className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                              )}
                             </div>
-                            {msg.unread && (
+                            {conv.unread && (
                               <div className="absolute -top-0.5 -right-0.5 h-3 w-3 sm:h-3.5 sm:w-3.5 rounded-full bg-primary border-2 border-card" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
                               <span
-                                className={`font-medium text-sm sm:text-base truncate ${msg.unread ? 'text-foreground' : 'text-muted-foreground'}`}
+                                className={`font-medium text-sm sm:text-base truncate ${conv.unread ? 'text-foreground' : 'text-muted-foreground'}`}
                               >
-                                {msg.senderName}
+                                {conv.participant.name || 'Uzivatel'}
                               </span>
                               <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0">
-                                {msg.timestamp}
+                                {formatTimestamp(conv.timestamp)}
                               </span>
                             </div>
                             <p className="text-[10px] sm:text-xs text-primary/80 truncate mt-0.5">
-                              {msg.productName}
+                              {conv.product.name}
                             </p>
                             <p
-                              className={`text-xs sm:text-sm truncate mt-1 ${msg.unread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}
+                              className={`text-xs sm:text-sm truncate mt-1 ${conv.unread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}
                             >
-                              {msg.lastMessage}
+                              {conv.lastMessage}
                             </p>
                           </div>
                         </div>
@@ -139,7 +362,7 @@ function MessagesContent() {
                   ) : (
                     <div className="flex-1 flex items-center justify-center text-center p-8">
                       <div>
-                        <p className="text-muted-foreground">Žádné konverzace nenalezeny</p>
+                        <p className="text-muted-foreground">Zadne konverzace</p>
                       </div>
                     </div>
                   )}
@@ -150,7 +373,7 @@ function MessagesContent() {
               <div
                 className={`flex-1 flex flex-col ${selectedConversation ? 'flex' : 'hidden md:flex'}`}
               >
-                {selectedMessage ? (
+                {selectedConv ? (
                   <>
                     {/* Chat Header */}
                     <div className="p-3 sm:p-4 border-b border-border shrink-0 bg-secondary/30">
@@ -162,27 +385,37 @@ function MessagesContent() {
                           <ChevronLeft className="h-5 w-5" />
                         </button>
                         <div className="relative h-8 w-8 sm:h-10 sm:w-10 rounded-full overflow-hidden bg-secondary shrink-0">
-                          <Image
-                            src={selectedMessage.senderAvatar || '/placeholder.svg'}
-                            alt={selectedMessage.senderName}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-sm sm:text-base truncate">{selectedMessage.senderName}</h3>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                            {selectedMessage.productName}
-                          </p>
-                        </div>
-                        <Link href={`/product/${selectedMessage.productId}`} className="shrink-0 hidden xs:block">
-                          <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-secondary border border-border hover:border-primary transition-colors">
+                          {selectedConv.participant.avatar_url ? (
                             <Image
-                              src={selectedMessage.productImage || '/placeholder.svg'}
-                              alt={selectedMessage.productName}
+                              src={selectedConv.participant.avatar_url}
+                              alt={selectedConv.participant.name || 'User'}
                               fill
                               className="object-cover"
                             />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-sm sm:text-base truncate">
+                            {selectedConv.participant.name || 'Uzivatel'}
+                          </h3>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                            {selectedConv.product.name}
+                          </p>
+                        </div>
+                        <Link href={`/product/${selectedConv.product.id}`} className="shrink-0 hidden xs:block">
+                          <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-secondary border border-border hover:border-primary transition-colors">
+                            {selectedConv.product.image && (
+                              <Image
+                                src={selectedConv.product.image}
+                                alt={selectedConv.product.name}
+                                fill
+                                className="object-cover"
+                              />
+                            )}
                           </div>
                         </Link>
                         <DropdownMenu>
@@ -198,7 +431,7 @@ function MessagesContent() {
                             </DropdownMenuItem>
                             <DropdownMenuItem className="gap-2">
                               <Flag className="h-4 w-4" />
-                              Nahlásit
+                              Nahlasit
                             </DropdownMenuItem>
                             <DropdownMenuItem className="gap-2 text-destructive">
                               <Trash2 className="h-4 w-4" />
@@ -212,66 +445,43 @@ function MessagesContent() {
                     {/* Messages Area */}
                     <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-background/50">
                       <div className="space-y-3 sm:space-y-4 max-w-3xl mx-auto">
-                        {/* Date Separator */}
-                        <div className="flex items-center gap-3 sm:gap-4 my-3 sm:my-4">
-                          <div className="flex-1 h-px bg-border" />
-                          <span className="text-[10px] sm:text-xs text-muted-foreground px-2">Dnes</span>
-                          <div className="flex-1 h-px bg-border" />
-                        </div>
-
-                        {/* Incoming Message */}
-                        <div className="flex gap-2 sm:gap-3">
-                          <div className="relative h-7 w-7 sm:h-8 sm:w-8 rounded-full overflow-hidden bg-secondary shrink-0">
-                            <Image
-                              src={selectedMessage.senderAvatar || '/placeholder.svg'}
-                              alt={selectedMessage.senderName}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="space-y-1 max-w-[80%] sm:max-w-[75%]">
-                            <div className="bg-secondary rounded-2xl rounded-tl-sm px-3 sm:px-4 py-2 sm:py-2.5">
-                              <p className="text-xs sm:text-sm">{selectedMessage.lastMessage}</p>
+                        {messages.map((msg) => (
+                          <div
+                            key={msg.id}
+                            className={`flex gap-2 sm:gap-3 ${msg.sender_id === currentUserId ? 'justify-end' : ''}`}
+                          >
+                            {msg.sender_id !== currentUserId && (
+                              <div className="relative h-7 w-7 sm:h-8 sm:w-8 rounded-full overflow-hidden bg-secondary shrink-0">
+                                {selectedConv.participant.avatar_url ? (
+                                  <Image
+                                    src={selectedConv.participant.avatar_url}
+                                    alt=""
+                                    fill
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center">
+                                    <User className="h-3 w-3 text-muted-foreground" />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <div className={`space-y-1 max-w-[80%] sm:max-w-[75%] ${msg.sender_id === currentUserId ? 'items-end' : ''}`}>
+                              <div
+                                className={`rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5 ${
+                                  msg.sender_id === currentUserId
+                                    ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                                    : 'bg-secondary rounded-tl-sm'
+                                }`}
+                              >
+                                <p className="text-xs sm:text-sm">{msg.text}</p>
+                              </div>
+                              <span className={`text-[10px] sm:text-xs text-muted-foreground ${msg.sender_id === currentUserId ? 'mr-2 text-right block' : 'ml-2'}`}>
+                                {formatTimestamp(msg.created_at)}
+                              </span>
                             </div>
-                            <span className="text-[10px] sm:text-xs text-muted-foreground ml-2">
-                              {selectedMessage.timestamp}
-                            </span>
                           </div>
-                        </div>
-
-                        {/* Outgoing Message Example */}
-                        <div className="flex gap-2 sm:gap-3 justify-end">
-                          <div className="space-y-1 max-w-[80%] sm:max-w-[75%]">
-                            <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-3 sm:px-4 py-2 sm:py-2.5">
-                              <p className="text-xs sm:text-sm">
-                                Dobrý den, děkuji za zájem! Ano, šipky jsou stále dostupné.
-                              </p>
-                            </div>
-                            <span className="text-[10px] sm:text-xs text-muted-foreground mr-2 text-right block">
-                              Před 5 minutami
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Another Incoming Message */}
-                        <div className="flex gap-2 sm:gap-3">
-                          <div className="relative h-7 w-7 sm:h-8 sm:w-8 rounded-full overflow-hidden bg-secondary shrink-0">
-                            <Image
-                              src={selectedMessage.senderAvatar || '/placeholder.svg'}
-                              alt={selectedMessage.senderName}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="space-y-1 max-w-[80%] sm:max-w-[75%]">
-                            <div className="bg-secondary rounded-2xl rounded-tl-sm px-3 sm:px-4 py-2 sm:py-2.5">
-                              <p className="text-xs sm:text-sm">
-                                Super! Bylo by možné se domluvit na osobním předání v Praze?
-                              </p>
-                            </div>
-                            <span className="text-[10px] sm:text-xs text-muted-foreground ml-2">Právě teď</span>
-                          </div>
-                        </div>
+                        ))}
                       </div>
                     </div>
 
@@ -279,18 +489,27 @@ function MessagesContent() {
                     <div className="p-2 sm:p-4 border-t border-border shrink-0 bg-card">
                       <div className="flex gap-2 sm:gap-3 max-w-3xl mx-auto">
                         <Input
-                          placeholder="Napište zprávu..."
+                          placeholder="Napiste zpravu..."
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newMessage.trim()) {
-                              setNewMessage('')
+                            if (e.key === 'Enter' && newMessage.trim() && !isSending) {
+                              handleSendMessage()
                             }
                           }}
                           className="flex-1 bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-primary text-sm"
                         />
-                        <Button size="icon" disabled={!newMessage.trim()} className="shrink-0 h-9 w-9 sm:h-10 sm:w-10">
-                          <Send className="h-4 w-4" />
+                        <Button 
+                          size="icon" 
+                          disabled={!newMessage.trim() || isSending} 
+                          className="shrink-0 h-9 w-9 sm:h-10 sm:w-10"
+                          onClick={handleSendMessage}
+                        >
+                          {isSending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -303,7 +522,7 @@ function MessagesContent() {
                       </div>
                       <h3 className="text-lg font-semibold mb-2">Vyberte konverzaci</h3>
                       <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                        Vyberte konverzaci ze seznamu vlevo pro zobrazení zpráv
+                        Vyberte konverzaci ze seznamu vlevo pro zobrazeni zprav
                       </p>
                     </div>
                   </div>

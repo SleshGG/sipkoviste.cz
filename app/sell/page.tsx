@@ -33,9 +33,12 @@ import {
   Circle,
   Package,
   AlertCircle,
+  Loader2,
 } from 'lucide-react'
 import { brands, materials, weights, conditions } from '@/lib/data'
 import { cn } from '@/lib/utils'
+import { createProductAction } from '@/lib/supabase/actions'
+import type { ProductInsert } from '@/lib/supabase/types'
 
 const steps = [
   { id: 1, name: 'Fotky', description: 'Přidejte obrázky' },
@@ -69,6 +72,7 @@ export default function SellPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>({
     images: [],
     category: '',
@@ -135,8 +139,38 @@ export default function SellPage() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    router.push('/dashboard')
+    setError(null)
+    
+    try {
+      const productData: ProductInsert = {
+        seller_id: '', // Will be set by the server action
+        name: formData.title,
+        brand: formData.brand,
+        price: parseInt(formData.price),
+        weight: formData.weight || null,
+        material: formData.material || null,
+        condition: formData.condition as 'Nové' | 'Jako nové' | 'Dobré' | 'Uspokojivé',
+        category: formData.category as 'steel-darts' | 'soft-darts' | 'dartboards' | 'accessories',
+        image: formData.images[0] || null,
+        images: formData.images,
+        description: formData.description || null,
+        negotiable: formData.negotiable,
+        specs: {},
+      }
+
+      const result = await createProductAction(productData)
+      
+      if (result.error) {
+        setError(result.error)
+        setIsSubmitting(false)
+        return
+      }
+
+      router.push('/dashboard')
+    } catch (err) {
+      setError('Nepodarilo se vytvorit inzerat. Zkuste to prosim znovu.')
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -199,6 +233,18 @@ export default function SellPage() {
             ))}
           </div>
         </motion.div>
+
+        {/* Error Message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive"
+          >
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            <p className="text-sm">{error}</p>
+          </motion.div>
+        )}
 
         {/* Form Steps */}
         <Card className="border-border bg-card p-6">
@@ -579,13 +625,13 @@ export default function SellPage() {
               >
                 {isSubmitting ? (
                   <>
-                    <div className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Publikuji...
                   </>
                 ) : (
                   <>
                     <Check className="h-4 w-4" />
-                    Publikovat inzerát
+                    Publikovat inzerat
                   </>
                 )}
               </Button>

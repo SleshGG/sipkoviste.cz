@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -32,8 +32,11 @@ import {
   ChevronRight,
   Check,
   Flag,
+  Loader2,
 } from 'lucide-react'
 import type { Product } from '@/lib/data'
+import { createClient } from '@/lib/supabase/client'
+import { sendMessageAction } from '@/lib/supabase/actions'
 
 const safetyTips = [
   'Při osobním předání se setkejte na veřejném místě',
@@ -55,8 +58,38 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
   const [message, setMessage] = useState('')
   const [isFavorited, setIsFavorited] = useState(false)
   const [messageSent, setMessageSent] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
-  const handleSendMessage = () => {
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id || null)
+    })
+  }, [])
+
+  const handleSendMessage = async () => {
+    if (!currentUserId) {
+      // User not logged in - redirect to login or show message
+      alert('Pro odesilani zprav se musite prihlasit')
+      return
+    }
+
+    setIsSending(true)
+    
+    const result = await sendMessageAction({
+      receiver_id: product.seller.id,
+      product_id: product.id,
+      text: message,
+    })
+
+    setIsSending(false)
+
+    if (result.error) {
+      alert(result.error)
+      return
+    }
+
     setMessageSent(true)
     setTimeout(() => {
       setIsMessageDialogOpen(false)
@@ -356,8 +389,8 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
                 >
                   Zrušit
                 </Button>
-                <Button className="flex-1 text-sm h-9 sm:h-10" onClick={handleSendMessage} disabled={!message.trim()}>
-                  Odeslat
+                <Button className="flex-1 text-sm h-9 sm:h-10" onClick={handleSendMessage} disabled={!message.trim() || isSending}>
+                  {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Odeslat'}
                 </Button>
               </div>
             </>

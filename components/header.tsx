@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -10,16 +11,81 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Target, Search, Plus, MessageCircle, User, Menu, Settings, LogOut, Package } from 'lucide-react'
-import { useState } from 'react'
+import { Target, Search, Plus, MessageCircle, User, Menu, Settings, LogOut, Package, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import { AuthDialog } from '@/components/auth-dialog'
+import { createClient } from '@/lib/supabase/client'
+import { signOut } from '@/lib/supabase/actions'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
+import type { Profile } from '@/lib/supabase/types'
 
 export function Header() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false) // Mock auth state
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    // Get initial session
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+      if (user) {
+        // Fetch profile
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+          .then(({ data }) => {
+            setProfile(data)
+          })
+      }
+      setIsLoading(false)
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null)
+      if (session?.user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        setProfile(data)
+      } else {
+        setProfile(null)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleSignOut = async () => {
+    setIsLoggingOut(true)
+    await signOut()
+    setUser(null)
+    setProfile(null)
+    setIsLoggingOut(false)
+    router.push('/')
+    router.refresh()
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/marketplace?q=${encodeURIComponent(searchQuery)}`)
+    }
+  }
+
+  const isLoggedIn = !!user
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -29,27 +95,27 @@ export function Header() {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
             <Target className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold tracking-tight">Šipkoviště.cz</span>
+          <span className="text-xl font-bold tracking-tight">Sipkoviste.cz</span>
         </Link>
 
         {/* Search Bar - Hidden on mobile */}
-        <div className="hidden flex-1 max-w-xl md:flex">
+        <form onSubmit={handleSearch} className="hidden flex-1 max-w-xl md:flex">
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Hledejte šipky, terče, příslušenství..."
+              placeholder="Hledejte sipky, terce, prislusenstvi..."
               className="w-full pl-10 bg-secondary border-border"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-        </div>
+        </form>
 
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-2 md:flex">
           <Link href="/marketplace">
             <Button variant="ghost" size="sm">
-              Procházet
+              Prochazet
             </Button>
           </Link>
           <Link href="/sell">
@@ -59,14 +125,15 @@ export function Header() {
             </Button>
           </Link>
           
-          {isLoggedIn ? (
+          {isLoading ? (
+            <Button variant="ghost" size="sm" disabled>
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </Button>
+          ) : isLoggedIn ? (
             <>
               <Link href="/messages">
                 <Button variant="ghost" size="icon" className="relative">
                   <MessageCircle className="h-5 w-5" />
-                  <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center">
-                    2
-                  </Badge>
                 </Button>
               </Link>
               <DropdownMenu>
@@ -81,8 +148,8 @@ export function Header() {
                       <User className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">Jan Novak</p>
-                      <p className="text-xs text-muted-foreground">jan@example.cz</p>
+                      <p className="text-sm font-medium">{profile?.name || 'Uzivatel'}</p>
+                      <p className="text-xs text-muted-foreground">{user?.email}</p>
                     </div>
                   </div>
                   <DropdownMenuSeparator />
@@ -107,9 +174,14 @@ export function Header() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     className="text-destructive cursor-pointer"
-                    onClick={() => setIsLoggedIn(false)}
+                    onClick={handleSignOut}
+                    disabled={isLoggingOut}
                   >
-                    <LogOut className="h-4 w-4 mr-2" />
+                    {isLoggingOut ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <LogOut className="h-4 w-4 mr-2" />
+                    )}
                     Odhlasit se
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -143,8 +215,8 @@ export function Header() {
                     <User className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium">Jan Novak</p>
-                    <p className="text-sm text-muted-foreground">jan@example.cz</p>
+                    <p className="font-medium">{profile?.name || 'Uzivatel'}</p>
+                    <p className="text-sm text-muted-foreground">{user?.email}</p>
                   </div>
                 </div>
               ) : (
@@ -158,13 +230,15 @@ export function Header() {
                   </Button>
                 </div>
               )}
-              <div className="relative">
+              <form onSubmit={handleSearch} className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Hledat..."
                   className="pl-10 bg-secondary"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
-              </div>
+              </form>
               <nav className="flex flex-col gap-2 px-0">
                 <Link href="/marketplace">
                   <Button variant="ghost" className="w-full justify-start gap-2">
@@ -190,7 +264,6 @@ export function Header() {
                       <Button variant="ghost" className="w-full justify-start gap-2">
                         <MessageCircle className="h-4 w-4" />
                         Zpravy
-                        <Badge className="ml-auto">2</Badge>
                       </Button>
                     </Link>
                     <Link href="/dashboard?tab=settings">
@@ -202,9 +275,14 @@ export function Header() {
                     <Button 
                       variant="ghost" 
                       className="w-full justify-start gap-2 text-destructive hover:text-destructive"
-                      onClick={() => setIsLoggedIn(false)}
+                      onClick={handleSignOut}
+                      disabled={isLoggingOut}
                     >
-                      <LogOut className="h-4 w-4" />
+                      {isLoggingOut ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <LogOut className="h-4 w-4" />
+                      )}
                       Odhlasit se
                     </Button>
                   </>
