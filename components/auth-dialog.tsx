@@ -16,7 +16,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Target, Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { signIn, signUp } from '@/lib/supabase/actions'
+import { createClient } from '@/lib/supabase/client'
 
 interface AuthDialogProps {
   open: boolean
@@ -45,13 +45,21 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     setIsLoading(true)
     setError(null)
     
-    const result = await signIn(loginForm.email, loginForm.password)
+    const supabase = createClient()
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginForm.email,
+      password: loginForm.password,
+    })
     
-    if (result.error) {
-      setError(result.error)
+    if (error) {
+      setError(error.message === 'Invalid login credentials' 
+        ? 'Neplatne prihlasovaci udaje' 
+        : error.message)
       setIsLoading(false)
       return
     }
+    
+    console.log('[v0] Login successful, user:', data.user?.email)
     
     setIsLoading(false)
     setShowSuccess(true)
@@ -60,7 +68,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
       setShowSuccess(false)
       onOpenChange(false)
       setLoginForm({ email: '', password: '' })
-      router.refresh()
+      window.location.reload() // Force full reload to update auth state
     }, 1500)
   }
 
@@ -70,24 +78,36 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     setError(null)
     
     if (registerForm.password !== registerForm.confirmPassword) {
-      setError('Hesla se neshodují')
+      setError('Hesla se neshoduji')
       setIsLoading(false)
       return
     }
 
     if (registerForm.password.length < 8) {
-      setError('Heslo musí mít alespoň 8 znaků')
+      setError('Heslo musi mit alespon 8 znaku')
       setIsLoading(false)
       return
     }
     
-    const result = await signUp(registerForm.email, registerForm.password, registerForm.name)
+    const supabase = createClient()
+    const { data, error } = await supabase.auth.signUp({
+      email: registerForm.email,
+      password: registerForm.password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+        data: {
+          name: registerForm.name,
+        },
+      },
+    })
     
-    if (result.error) {
-      setError(result.error)
+    if (error) {
+      setError(error.message)
       setIsLoading(false)
       return
     }
+    
+    console.log('[v0] Registration successful, user:', data.user?.email)
     
     setIsLoading(false)
     setShowSuccess(true)

@@ -34,7 +34,8 @@ export function Header() {
     const supabase = createClient()
 
     // Get initial session
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      console.log('[v0] Header getUser:', user?.email, 'error:', error?.message)
       setUser(user)
       if (user) {
         // Fetch profile
@@ -43,7 +44,8 @@ export function Header() {
           .select('*')
           .eq('id', user.id)
           .single()
-          .then(({ data }) => {
+          .then(({ data, error: profileError }) => {
+            console.log('[v0] Profile fetch:', data?.name, 'error:', profileError?.message)
             setProfile(data)
           })
       }
@@ -52,6 +54,7 @@ export function Header() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[v0] Auth state changed:', event, session?.user?.email)
       setUser(session?.user ?? null)
       if (session?.user) {
         const { data } = await supabase
