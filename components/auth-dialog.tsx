@@ -42,16 +42,26 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('[v0] Login attempt started for:', loginForm.email)
     setIsLoading(true)
     setError(null)
     
     const supabase = createClient()
+    console.log('[v0] Supabase client created')
+    
     const { data, error } = await supabase.auth.signInWithPassword({
       email: loginForm.email,
       password: loginForm.password,
     })
     
+    console.log('[v0] signInWithPassword response:', { 
+      user: data?.user?.email, 
+      session: !!data?.session,
+      error: error?.message 
+    })
+    
     if (error) {
+      console.log('[v0] Login error:', error.message)
       setError(error.message === 'Invalid login credentials' 
         ? 'Neplatne prihlasovaci udaje' 
         : error.message)
@@ -65,10 +75,11 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     setShowSuccess(true)
     
     setTimeout(() => {
+      console.log('[v0] Reloading page...')
       setShowSuccess(false)
       onOpenChange(false)
       setLoginForm({ email: '', password: '' })
-      window.location.reload() // Force full reload to update auth state
+      window.location.reload()
     }, 1500)
   }
 
