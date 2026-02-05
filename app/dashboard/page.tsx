@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -41,8 +41,12 @@ import {
   Bell,
   Shield,
   ChevronRight,
+  Loader2,
 } from 'lucide-react'
 import { mockListings } from '@/lib/data'
+import { createClient } from '@/lib/supabase/client'
+import { deleteProductAction, updateProfileAction } from '@/lib/supabase/actions'
+import type { Product, Profile } from '@/lib/supabase/types'
 
 function DashboardContent() {
   const searchParams = useSearchParams()
@@ -51,11 +55,66 @@ function DashboardContent() {
   const [activeTab, setActiveTab] = useState(initialTab)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [listingToDelete, setListingToDelete] = useState<string | null>(null)
-  const [listings, setListings] = useState(mockListings)
+  const [listings, setListings] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
-  const handleDeleteListing = () => {
+  useEffect(() => {
+    const supabase = createClient()
+    
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) {
+        setIsLoading(false)
+        return
+      }
+      
+      setCurrentUserId(user.id)
+      
+      // Fetch user's products
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('seller_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (productsError) {
+        console.error('Error fetching products:', productsError)
+        // Fallback to mock data
+        setListings(mockListings)
+      } else if (products && products.length > 0) {
+        setListings(products)
+      } else {
+        // No products, show empty state
+        setListings([])
+      }
+
+      // Fetch profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (profileData) {
+        setProfile(profileData)
+      }
+
+      setIsLoading(false)
+    })
+  }, [])
+
+  const handleDeleteListing = async () => {
     if (listingToDelete) {
-      setListings((prev) => prev.filter((l) => l.id !== listingToDelete))
+      setIsDeleting(true)
+      const result = await deleteProductAction(listingToDelete)
+      
+      if (!result.error) {
+        setListings((prev) => prev.filter((l) => l.id !== listingToDelete))
+      }
+      
+      setIsDeleting(false)
       setDeleteDialogOpen(false)
       setListingToDelete(null)
     }
@@ -63,6 +122,14 @@ function DashboardContent() {
 
   const handleToggleVisibility = (id: string) => {
     console.log('Toggle visibility for:', id)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -433,7 +500,8 @@ function DashboardContent() {
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
               Zrušit
             </Button>
-            <Button variant="destructive" onClick={handleDeleteListing}>
+            <Button variant="destructive" onClick={handleDeleteListing} disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Smazat
             </Button>
           </div>

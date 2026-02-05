@@ -1,8 +1,8 @@
 'use client'
 
 import React from "react"
-
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,8 +14,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Target, Mail, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Target, Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { signIn, signUp } from '@/lib/supabase/actions'
 
 interface AuthDialogProps {
   open: boolean
@@ -23,10 +24,12 @@ interface AuthDialogProps {
 }
 
 export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Form states
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
@@ -40,9 +43,15 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
     
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    const result = await signIn(loginForm.email, loginForm.password)
+    
+    if (result.error) {
+      setError(result.error)
+      setIsLoading(false)
+      return
+    }
     
     setIsLoading(false)
     setShowSuccess(true)
@@ -51,15 +60,34 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
       setShowSuccess(false)
       onOpenChange(false)
       setLoginForm({ email: '', password: '' })
+      router.refresh()
     }, 1500)
   }
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
     
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    if (registerForm.password !== registerForm.confirmPassword) {
+      setError('Hesla se neshodují')
+      setIsLoading(false)
+      return
+    }
+
+    if (registerForm.password.length < 8) {
+      setError('Heslo musí mít alespoň 8 znaků')
+      setIsLoading(false)
+      return
+    }
+    
+    const result = await signUp(registerForm.email, registerForm.password, registerForm.name)
+    
+    if (result.error) {
+      setError(result.error)
+      setIsLoading(false)
+      return
+    }
     
     setIsLoading(false)
     setShowSuccess(true)
@@ -68,7 +96,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
       setShowSuccess(false)
       onOpenChange(false)
       setRegisterForm({ name: '', email: '', password: '', confirmPassword: '' })
-    }, 1500)
+    }, 2000)
   }
 
   return (
@@ -96,8 +124,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               </h3>
               <p className="text-sm text-muted-foreground text-center">
                 {activeTab === 'login'
-                  ? 'Vitejte zpet v Šipkoviště.cz'
-                  : 'Nyni se muzete prihlasit'}
+                  ? 'Vitejte zpet v Sipkoviste.cz'
+                  : 'Potvrdte svuj email pro aktivaci uctu'}
               </p>
             </motion.div>
           ) : (
@@ -115,15 +143,23 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                   </div>
                 </div>
                 <DialogHeader>
-                  <DialogTitle className="text-xl sm:text-2xl">Vitejte v Šipkoviště.cz</DialogTitle>
+                  <DialogTitle className="text-xl sm:text-2xl">Vitejte v Sipkoviste.cz</DialogTitle>
                   <DialogDescription className="text-sm">
                     Prihlaste se nebo si vytvorte ucet pro pristup k trzisti
                   </DialogDescription>
                 </DialogHeader>
               </div>
 
+              {/* Error Message */}
+              {error && (
+                <div className="mx-6 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <p className="text-sm">{error}</p>
+                </div>
+              )}
+
               {/* Tabs */}
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'register')} className="w-full">
+              <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as 'login' | 'register'); setError(null); }} className="w-full">
                 <TabsList className="w-full rounded-none border-b border-border bg-transparent h-12">
                   <TabsTrigger
                     value="login"
@@ -200,39 +236,6 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                       )}
                     </Button>
                   </form>
-
-                  <div className="relative my-6">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-border" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">nebo</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Button variant="outline" className="w-full h-11 gap-2 bg-transparent">
-                      <svg className="h-4 w-4" viewBox="0 0 24 24">
-                        <path
-                          fill="currentColor"
-                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                        />
-                        <path
-                          fill="currentColor"
-                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                        />
-                        <path
-                          fill="currentColor"
-                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                        />
-                        <path
-                          fill="currentColor"
-                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                        />
-                      </svg>
-                      Pokracovat s Google
-                    </Button>
-                  </div>
                 </TabsContent>
 
                 {/* Register Form */}

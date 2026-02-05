@@ -5,11 +5,12 @@ import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Star, Weight } from 'lucide-react'
-import type { Product } from '@/lib/data'
+import type { ProductWithSeller } from '@/lib/supabase/types'
+import type { Product as MockProduct } from '@/lib/data'
 import { motion } from 'framer-motion'
 
 interface ProductCardProps {
-  product: Product
+  product: ProductWithSeller | MockProduct
   index?: number
 }
 
@@ -57,15 +58,17 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
             </div>
             <div className="flex items-center justify-between mt-auto gap-1">
               <span className="text-sm sm:text-lg font-bold text-primary">
-                {product.price.toLocaleString('cs-CZ')} Kč
+                {product.price.toLocaleString('cs-CZ')} Kc
               </span>
-              <div className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs shrink-0">
-                <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-primary text-primary" />
-                <span>{product.seller.rating}</span>
-                <span className="text-muted-foreground hidden xs:inline">
-                  ({product.seller.reviewCount})
-                </span>
-              </div>
+              {'seller' in product && product.seller && (
+                <div className="flex items-center gap-0.5 sm:gap-1 text-[10px] sm:text-xs shrink-0">
+                  <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-primary text-primary" />
+                  <span>{product.seller.rating}</span>
+                  <span className="text-muted-foreground hidden xs:inline">
+                    ({product.seller.review_count ?? ('reviewCount' in product.seller ? product.seller.reviewCount : 0)})
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </Card>

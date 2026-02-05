@@ -19,7 +19,15 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { SlidersHorizontal } from 'lucide-react'
-import { brands, materials, conditions, weights, categories } from '@/lib/data'
+import { brands, materials, conditions, weights } from '@/lib/data'
+
+// Staticke kategorie - pocty se aktualizuji dynamicky
+const defaultCategories = [
+  { id: 'steel-darts', name: 'Ocelove sipky' },
+  { id: 'soft-darts', name: 'Softove sipky' },
+  { id: 'dartboards', name: 'Terce' },
+  { id: 'accessories', name: 'Prislusenstvi' },
+]
 
 interface FiltersState {
   priceRange: [number, number]
@@ -115,7 +123,7 @@ function FilterContent({ filters, onFiltersChange }: MarketplaceFiltersProps) {
           <AccordionTrigger className="text-sm hover:no-underline">Kategorie</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-3 pt-2">
-              {categories.map((category) => (
+              {defaultCategories.map((category) => (
                 <div key={category.id} className="flex items-center space-x-2">
                   <Checkbox
                     id={`category-${category.id}`}
@@ -127,7 +135,6 @@ function FilterContent({ filters, onFiltersChange }: MarketplaceFiltersProps) {
                   <Label htmlFor={`category-${category.id}`} className="text-sm font-normal cursor-pointer flex-1">
                     {category.name}
                   </Label>
-                  <span className="text-xs text-muted-foreground">{category.count}</span>
                 </div>
               ))}
             </div>
