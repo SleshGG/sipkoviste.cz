@@ -85,6 +85,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('[v0] Register attempt for:', registerForm.email)
     setIsLoading(true)
     setError(null)
     
@@ -100,34 +101,52 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
       return
     }
     
-    const supabase = createClient()
-    const { data, error } = await supabase.auth.signUp({
-      email: registerForm.email,
-      password: registerForm.password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: {
-          name: registerForm.name,
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signUp({
+        email: registerForm.email,
+        password: registerForm.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            name: registerForm.name,
+          },
         },
-      },
-    })
-    
-    if (error) {
-      setError(error.message)
+      })
+      
+      console.log('[v0] signUp response:', {
+        user: data?.user?.email,
+        session: !!data?.session,
+        identities: data?.user?.identities?.length,
+        error: error?.message,
+      })
+      
+      if (error) {
+        setError(error.message)
+        setIsLoading(false)
+        return
+      }
+
+      // Supabase returns a user with empty identities if email already exists
+      if (data?.user?.identities?.length === 0) {
+        setError('Ucet s timto emailem jiz existuje. Zkuste se prihlasit.')
+        setIsLoading(false)
+        return
+      }
+      
       setIsLoading(false)
-      return
+      setShowSuccess(true)
+      
+      setTimeout(() => {
+        setShowSuccess(false)
+        onOpenChange(false)
+        setRegisterForm({ name: '', email: '', password: '', confirmPassword: '' })
+      }, 2000)
+    } catch (err) {
+      console.log('[v0] Register error:', err)
+      setError('Doslo k chybe pri registraci. Zkuste to znovu.')
+      setIsLoading(false)
     }
-    
-    console.log('[v0] Registration successful, user:', data.user?.email)
-    
-    setIsLoading(false)
-    setShowSuccess(true)
-    
-    setTimeout(() => {
-      setShowSuccess(false)
-      onOpenChange(false)
-      setRegisterForm({ name: '', email: '', password: '', confirmPassword: '' })
-    }, 2000)
   }
 
   return (
