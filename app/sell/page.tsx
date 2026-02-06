@@ -37,7 +37,8 @@ import {
 } from 'lucide-react'
 import { brands, materials, weights, conditions } from '@/lib/data'
 import { cn } from '@/lib/utils'
-import { createProductAction, uploadProductImage } from '@/lib/supabase/actions'
+import { createProductAction } from '@/lib/supabase/actions'
+import { uploadProductImage } from '@/lib/supabase/upload'
 import type { ProductInsert } from '@/lib/supabase/types'
 
 const steps = [
@@ -156,10 +157,8 @@ export default function SellPage() {
       const uploadedUrls: string[] = []
       
       for (const imageFile of formData.images) {
-        const fd = new window.FormData()
-        fd.append('file', imageFile.file)
-        
-        const uploadResult = await uploadProductImage(fd)
+        console.log('[v0] Uploading image:', imageFile.file.name)
+        const uploadResult = await uploadProductImage(imageFile.file)
         
         if (uploadResult.error) {
           setError(`Chyba pri nahravani obrazku: ${uploadResult.error}`)
@@ -171,6 +170,8 @@ export default function SellPage() {
           uploadedUrls.push(uploadResult.url)
         }
       }
+      
+      console.log('[v0] All images uploaded:', uploadedUrls)
       
       const productData: ProductInsert = {
         seller_id: '', // Will be set by the server action
