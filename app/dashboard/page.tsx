@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -42,9 +42,11 @@ import {
   Shield,
   ChevronRight,
   Loader2,
+  Camera,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { deleteProductAction, updateProfileAction } from '@/lib/supabase/actions'
+import { uploadProductImage } from '@/lib/supabase/upload'
 import type { Product, Profile } from '@/lib/supabase/types'
 
 function DashboardContent() {
@@ -63,9 +65,8 @@ function DashboardContent() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string>('')
   const [formName, setFormName] = useState('')
-  const [formPhone, setFormPhone] = useState('')
-  const [formLocation, setFormLocation] = useState('')
-  const [formBio, setFormBio] = useState('')
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -126,6 +127,34 @@ function DashboardContent() {
 
   const handleToggleVisibility = (id: string) => {
     console.log('Toggle visibility for:', id)
+  }
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploadingAvatar(true)
+
+    const result = await uploadProductImage(file)
+
+    if (result.error) {
+      console.log('[v0] Avatar upload error:', result.error)
+      setIsUploadingAvatar(false)
+      return
+    }
+
+    if (result.url) {
+      const profileResult = await updateProfileAction({ avatar_url: result.url })
+      if (!profileResult.error && profileResult.data) {
+        setProfile(profileResult.data)
+      }
+    }
+
+    setIsUploadingAvatar(false)
+    // Reset file input
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = ''
+    }
   }
 
   const handleSaveProfile = async () => {
@@ -328,19 +357,40 @@ function DashboardContent() {
                       <h3 className="font-semibold">Nastavení profilu</h3>
                     </div>
                     <div className="flex flex-col items-center gap-4 mb-6">
-                      {profile?.avatar_url ? (
-                        <Image
-                          src={profile.avatar_url}
-                          alt="Avatar"
-                          width={96}
-                          height={96}
-                          className="h-24 w-24 rounded-full object-cover"
+                      <div className="relative group">
+                        {profile?.avatar_url ? (
+                          <Image
+                            src={profile.avatar_url}
+                            alt="Avatar"
+                            width={96}
+                            height={96}
+                            className="h-24 w-24 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-24 w-24 rounded-full bg-primary/20 flex items-center justify-center">
+                            <User className="h-12 w-12 text-primary" />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => avatarInputRef.current?.click()}
+                          disabled={isUploadingAvatar}
+                          className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        >
+                          {isUploadingAvatar ? (
+                            <Loader2 className="h-6 w-6 text-white animate-spin" />
+                          ) : (
+                            <Camera className="h-6 w-6 text-white" />
+                          )}
+                        </button>
+                        <input
+                          ref={avatarInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={handleAvatarUpload}
                         />
-                      ) : (
-                        <div className="h-24 w-24 rounded-full bg-primary/20 flex items-center justify-center">
-                          <User className="h-12 w-12 text-primary" />
-                        </div>
-                      )}
+                      </div>
                       <div className="text-center">
                         <p className="font-medium">{profile?.name || 'Uzivatel'}</p>
                         <p className="text-sm text-muted-foreground">
