@@ -37,7 +37,7 @@ import {
 } from 'lucide-react'
 import { brands, materials, weights, conditions } from '@/lib/data'
 import { cn } from '@/lib/utils'
-import { createProductAction } from '@/lib/supabase/actions'
+import { createProductAction, uploadProductImage } from '@/lib/supabase/actions'
 import type { ProductInsert } from '@/lib/supabase/types'
 
 const steps = [
@@ -54,8 +54,13 @@ const categoryOptions = [
   { id: 'accessories', name: 'Příslušenství', icon: Package, description: 'Letky, násadky, pouzdra a další' },
 ]
 
-interface FormData {
-  images: string[]
+interface ImageFile {
+  file: File
+  preview: string
+}
+
+interface SellFormData {
+  images: ImageFile[]
   category: string
   title: string
   brand: string
@@ -73,7 +78,7 @@ export default function SellPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<SellFormData>({
     images: [],
     category: '',
     title: '',
@@ -91,7 +96,10 @@ export default function SellPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
-      const newImages = Array.from(files).map((file) => URL.createObjectURL(file))
+      const newImages: ImageFile[] = Array.from(files).map((file) => ({
+        file,
+        preview: URL.createObjectURL(file),
+      }))
       setFormData((prev) => ({
         ...prev,
         images: [...prev.images, ...newImages].slice(0, 6),
@@ -100,6 +108,8 @@ export default function SellPage() {
   }
 
   const removeImage = (index: number) => {
+    // Revoke the object URL to free memory
+    URL.revokeObjectURL(formData.images[index].preview)
     setFormData((prev) => ({
       ...prev,
       images: prev.images.filter((_, i) => i !== index),
@@ -142,6 +152,26 @@ export default function SellPage() {
     setError(null)
     
     try {
+      // Upload images to Supabase Storage first
+      const uploadedUrls: string[] = []
+      
+      for (const imageFile of formData.images) {
+        const fd = new window.FormData()
+        fd.append('file', imageFile.file)
+        
+        const uploadResult = await uploadProductImage(fd)
+        
+        if (uploadResult.error) {
+          setError(`Chyba pri nahravani obrazku: ${uploadResult.error}`)
+          setIsSubmitting(false)
+          return
+        }
+        
+        if (uploadResult.url) {
+          uploadedUrls.push(uploadResult.url)
+        }
+      }
+      
       const productData: ProductInsert = {
         seller_id: '', // Will be set by the server action
         name: formData.title,
@@ -149,10 +179,10 @@ export default function SellPage() {
         price: parseInt(formData.price),
         weight: formData.weight || null,
         material: formData.material || null,
-        condition: formData.condition as 'Nové' | 'Jako nové' | 'Dobré' | 'Uspokojivé',
+        condition: formData.condition as 'Nove' | 'Jako nove' | 'Dobre' | 'Uspokojive',
         category: formData.category as 'steel-darts' | 'soft-darts' | 'dartboards' | 'accessories',
-        image: formData.images[0] || null,
-        images: formData.images,
+        image: uploadedUrls[0] || null,
+        images: uploadedUrls,
         description: formData.description || null,
         negotiable: formData.negotiable,
         specs: {},
@@ -168,6 +198,7 @@ export default function SellPage() {
 
       router.push('/dashboard')
     } catch (err) {
+      console.log('[v0] Submit error:', err)
       setError('Nepodarilo se vytvorit inzerat. Zkuste to prosim znovu.')
       setIsSubmitting(false)
     }
@@ -273,14 +304,14 @@ export default function SellPage() {
                 />
 
                 <div className="grid grid-cols-3 gap-3">
-                  {formData.images.map((image, index) => (
+                  {formData.images.map((imageFile, index) => (
                     <div
                       key={index}
                       className="relative aspect-square rounded-lg overflow-hidden bg-secondary group"
                     >
                       <Image
-                        src={image || "/placeholder.svg"}
-                        alt={`Nahrání ${index + 1}`}
+                        src={imageFile.preview || "/placeholder.svg"}
+                        alt={`Nahrani ${index + 1}`}
                         fill
                         className="object-cover"
                       />
