@@ -43,7 +43,6 @@ import {
   ChevronRight,
   Loader2,
 } from 'lucide-react'
-import { mockListings } from '@/lib/data'
 import { createClient } from '@/lib/supabase/client'
 import { deleteProductAction, updateProfileAction } from '@/lib/supabase/actions'
 import type { Product, Profile } from '@/lib/supabase/types'
@@ -58,8 +57,15 @@ function DashboardContent() {
   const [listings, setListings] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string>('')
+  const [formName, setFormName] = useState('')
+  const [formPhone, setFormPhone] = useState('')
+  const [formLocation, setFormLocation] = useState('')
+  const [formBio, setFormBio] = useState('')
 
   useEffect(() => {
     const supabase = createClient()
@@ -71,6 +77,7 @@ function DashboardContent() {
       }
       
       setCurrentUserId(user.id)
+      setUserEmail(user.email || '')
       
       // Fetch user's products
       const { data: products, error: productsError } = await supabase
@@ -81,13 +88,9 @@ function DashboardContent() {
 
       if (productsError) {
         console.error('Error fetching products:', productsError)
-        // Fallback to mock data
-        setListings(mockListings)
-      } else if (products && products.length > 0) {
-        setListings(products)
-      } else {
-        // No products, show empty state
         setListings([])
+      } else {
+        setListings(products || [])
       }
 
       // Fetch profile
@@ -99,6 +102,7 @@ function DashboardContent() {
 
       if (profileData) {
         setProfile(profileData)
+        setFormName(profileData.name || '')
       }
 
       setIsLoading(false)
@@ -122,6 +126,21 @@ function DashboardContent() {
 
   const handleToggleVisibility = (id: string) => {
     console.log('Toggle visibility for:', id)
+  }
+
+  const handleSaveProfile = async () => {
+    setIsSaving(true)
+    setSaveSuccess(false)
+
+    const result = await updateProfileAction({ name: formName })
+
+    if (!result.error && result.data) {
+      setProfile(result.data)
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 2000)
+    }
+
+    setIsSaving(false)
   }
 
   if (isLoading) {
@@ -261,9 +280,16 @@ function DashboardContent() {
                                                 </Badge>
                                               </div>
                                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 sm:mt-2 text-xs text-muted-foreground">
-                                                <span>12 zobrazení</span>
-                                                <span>3 dotazy</span>
-                                                <span className="hidden sm:inline">Přidáno {listing.createdAt}</span>
+                                                <span className="hidden sm:inline">
+                                                  {'Pridano '}
+                                                  {listing.created_at
+                                                    ? new Date(listing.created_at).toLocaleDateString('cs-CZ', {
+                                                        day: 'numeric',
+                                                        month: 'long',
+                                                        year: 'numeric',
+                                                      })
+                                                    : ''}
+                                                </span>
                                               </div>
                                             </div>
                                           </div>
@@ -302,41 +328,42 @@ function DashboardContent() {
                       <h3 className="font-semibold">Nastavení profilu</h3>
                     </div>
                     <div className="flex flex-col items-center gap-4 mb-6">
-                      <div className="h-24 w-24 rounded-full bg-primary/20 flex items-center justify-center">
-                        <User className="h-12 w-12 text-primary" />
-                      </div>
+                      {profile?.avatar_url ? (
+                        <Image
+                          src={profile.avatar_url}
+                          alt="Avatar"
+                          width={96}
+                          height={96}
+                          className="h-24 w-24 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-24 w-24 rounded-full bg-primary/20 flex items-center justify-center">
+                          <User className="h-12 w-12 text-primary" />
+                        </div>
+                      )}
                       <div className="text-center">
-                        <p className="font-medium">Jan Novák</p>
-                        <p className="text-sm text-muted-foreground">Člen od ledna 2024</p>
+                        <p className="font-medium">{profile?.name || 'Uzivatel'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {'Clen od '}
+                          {profile?.member_since
+                            ? new Date(profile.member_since).toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' })
+                            : ''}
+                        </p>
                       </div>
-                      <Button variant="outline" size="sm">
-                        Změnit avatar
-                      </Button>
                     </div>
                     <div className="grid gap-4">
                       <div className="grid gap-2">
-                        <Label htmlFor="name">Zobrazované jméno</Label>
-                        <Input id="name" defaultValue="Jan Novák" />
+                        <Label htmlFor="name">Zobrazovane jmeno</Label>
+                        <Input
+                          id="name"
+                          value={formName}
+                          onChange={(e) => setFormName(e.target.value)}
+                        />
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" defaultValue="jan@example.cz" />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="phone">Telefon</Label>
-                        <Input id="phone" type="tel" placeholder="+420 123 456 789" />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="location">Lokalita</Label>
-                        <Input id="location" placeholder="Praha" />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="bio">O mně</Label>
-                        <Textarea
-                          id="bio"
-                          placeholder="Řekněte kupujícím něco o sobě..."
-                          rows={3}
-                        />
+                        <Input id="email" type="email" value={userEmail} disabled className="opacity-70" />
+                        <p className="text-xs text-muted-foreground">Email nelze zmenit</p>
                       </div>
                     </div>
                   </div>
@@ -479,8 +506,27 @@ function DashboardContent() {
               </div>
 
               {/* Save Button */}
-              <div className="flex justify-end mt-6">
-                <Button size="lg">Uložit změny</Button>
+              <div className="flex items-center justify-end gap-3 mt-6">
+                {saveSuccess && (
+                  <motion.span
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="text-sm text-green-600"
+                  >
+                    Zmeny ulozeny
+                  </motion.span>
+                )}
+                <Button size="lg" onClick={handleSaveProfile} disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Ukladam...
+                    </>
+                  ) : (
+                    'Ulozit zmeny'
+                  )}
+                </Button>
               </div>
             </TabsContent>
           </Tabs>
