@@ -41,13 +41,19 @@ import { sendMessageAction, getFavoriteProductIdsAction, toggleFavoriteAction } 
 
 type Product = ProductWithSeller | MockProduct
 
-const safetyTips = [
-  'Při osobním předání se setkejte na veřejném místě',
-  'Před zaplacením si zboží důkladně prohlédněte',
-  'Používejte bezpečné platební metody',
-  'Buďte obezřetní u nabídek, které jsou příliš výhodné',
-  'Uchovávejte záznamy veškeré komunikace',
+const safetyTips: { label: string; text: string }[] = [
+  { label: 'Prověřte si hodnocení', text: 'Vždy se podívejte na hodnocení prodejce od ostatních šipkařů.' },
+  { label: 'Chtějte aktuální fotku', text: 'U drahých šipek žádejte fotku s lístkem, kde je jméno prodejce a dnešní datum.' },
+  { label: 'Osobní předání je jistota', text: 'Pokud je to možné, potkejte se u terče nebo na veřejném místě.' },
+  { label: 'Příliš levné "limitky"?', text: 'Buďte opatrní u nabídek, které jsou až podezřele výhodné.' },
 ]
+
+const categoryLabels: Record<string, string> = {
+  'steel-darts': 'Ocelové šipky',
+  'soft-darts': 'Softové šipky',
+  'dartboards': 'Terče',
+  'accessories': 'Příslušenství',
+}
 
 function formatMemberSince(value: string | undefined): string {
   if (!value) return '—'
@@ -74,6 +80,7 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false)
   const [isImageLightboxOpen, setIsImageLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
+  const [offerAmount, setOfferAmount] = useState('')
 
   useEffect(() => {
     const supabase = createClient()
@@ -123,11 +130,16 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
   }
 
   const handleSendMessage = async () => {
+    const text =
+      product.negotiable && offerAmount.trim() !== ''
+        ? `Nabízím ${offerAmount.trim().replace(/\s/g, '')} Kč.\n\n${message.trim()}`
+        : message.trim()
+    if (!text) return
     setIsSending(true)
     const result = await sendMessageAction({
       receiver_id: product.seller.id,
       product_id: product.id,
-      text: message,
+      text,
     })
     setIsSending(false)
 
@@ -137,6 +149,7 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
     }
 
     setMessageSent(true)
+    setOfferAmount('')
     setTimeout(() => {
       setIsMessageDialogOpen(false)
       setMessage('')
@@ -320,9 +333,23 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
               </div>
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-1 sm:mb-2">{product.name}</h1>
               <p className="text-sm sm:text-base text-muted-foreground">{product.brand}</p>
-              <p className="text-2xl sm:text-3xl font-bold text-primary mt-3 sm:mt-4">
-                {product.price.toLocaleString('cs-CZ')} Kč
-              </p>
+              <div className="flex flex-wrap items-baseline gap-2 mt-3 sm:mt-4">
+                <p className="text-2xl sm:text-3xl font-bold text-primary">
+                  {product.price.toLocaleString('cs-CZ')} Kč
+                </p>
+                {product.negotiable && (
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    Otevřeno nabídkám
+                  </Badge>
+                )}
+              </div>
+              {product.negotiable && (
+                <div className="mt-3 sm:mt-4 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 sm:px-4 sm:py-3">
+                  <p className="text-sm sm:text-base font-medium text-foreground">
+                    Prodejce je otevřen cenovým nabídkám — můžete mu napsat a nabídnout svou cenu.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Prodaný inzerát */}
@@ -363,12 +390,30 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
                 <h2 className="font-semibold text-sm sm:text-base mb-3 sm:mb-4">Specifikace</h2>
                 <div className="space-y-2 sm:space-y-3">
                   <div className="flex justify-between py-1.5 sm:py-2 border-b border-border">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Kategorie</span>
+                    <span className="text-xs sm:text-sm font-medium">
+                      {categoryLabels[product.category] ?? product.category}
+                    </span>
+                  </div>
+                  {product.brand && (
+                    <div className="flex justify-between py-1.5 sm:py-2 border-b border-border">
+                      <span className="text-xs sm:text-sm text-muted-foreground">Značka</span>
+                      <span className="text-xs sm:text-sm font-medium">{product.brand}</span>
+                    </div>
+                  )}
+                  {product.condition && (
+                    <div className="flex justify-between py-1.5 sm:py-2 border-b border-border">
+                      <span className="text-xs sm:text-sm text-muted-foreground">Stav</span>
+                      <span className="text-xs sm:text-sm font-medium">{product.condition}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1.5 sm:py-2 border-b border-border">
                     <span className="text-xs sm:text-sm text-muted-foreground">Hmotnost</span>
-                    <span className="text-xs sm:text-sm font-medium">{product.weight}</span>
+                    <span className="text-xs sm:text-sm font-medium">{product.weight ?? '—'}</span>
                   </div>
                   <div className="flex justify-between py-1.5 sm:py-2 border-b border-border">
                     <span className="text-xs sm:text-sm text-muted-foreground">Materiál</span>
-                    <span className="text-xs sm:text-sm font-medium">{product.material}</span>
+                    <span className="text-xs sm:text-sm font-medium">{product.material ?? '—'}</span>
                   </div>
                   {Object.entries(product.specs || {}).map(([key, value]) => (
                     <div key={key} className="flex justify-between py-1.5 sm:py-2 border-b border-border last:border-0">
@@ -439,12 +484,19 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
       </main>
 
       {/* Message Dialog */}
-      <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
+      <Dialog
+        open={isMessageDialogOpen}
+        onOpenChange={(open) => {
+          setIsMessageDialogOpen(open)
+          if (!open) setOfferAmount('')
+        }}
+      >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-base sm:text-lg">Napsat prodejci</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
               Odešlete zprávu prodejci {product.seller.name} ohledně tohoto zboží
+              {product.negotiable && ' — prodejce je otevřen cenovým nabídkám.'}
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-secondary rounded-lg mb-3 sm:mb-4">
@@ -473,6 +525,22 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
             </div>
           ) : (
             <>
+              {product.negotiable && (
+                <div className="mb-3 sm:mb-4">
+                  <label htmlFor="offer-amount" className="text-xs sm:text-sm font-medium text-foreground block mb-1.5">
+                    Vaše nabídka (Kč) — volitelné
+                  </label>
+                  <input
+                    id="offer-amount"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="např. 1 500"
+                    value={offerAmount}
+                    onChange={(e) => setOfferAmount(e.target.value.replace(/[^\d\s]/g, ''))}
+                    className="flex h-9 sm:h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              )}
               <Textarea
                 placeholder="Dobrý den, mám zájem o toto zboží. Je stále k dispozici?"
                 value={message}
@@ -488,7 +556,11 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
                 >
                   Zrušit
                 </Button>
-                <Button className="flex-1 text-sm h-9 sm:h-10" onClick={handleSendMessage} disabled={!message.trim() || isSending}>
+                <Button
+                  className="flex-1 text-sm h-9 sm:h-10"
+                  onClick={handleSendMessage}
+                  disabled={isSending || (!message.trim() && !(product.negotiable && offerAmount.trim()))}
+                >
                   {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Odeslat'}
                 </Button>
               </div>
@@ -503,6 +575,7 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
           className="max-w-[calc(100vw-2rem)] w-auto max-h-[calc(100vh-2rem)] p-0 border-0 bg-transparent shadow-none overflow-visible"
           closeButtonClassName="!bg-green-500 text-white rounded-full p-2 h-10 w-10 flex items-center justify-center hover:!bg-green-600 opacity-100 top-3 right-3 [&_svg]:size-5"
         >
+          <DialogTitle className="sr-only">Náhled obrázku inzerátu</DialogTitle>
           <div className="relative flex items-center justify-center min-h-[200px] bg-black/90 rounded-lg">
             <div className="relative max-w-[calc(100vw-4rem)] max-h-[calc(100vh-5rem)] w-full h-full flex items-center justify-center">
               <Image
@@ -553,21 +626,25 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 sm:space-y-4">
-            <div className="p-3 sm:p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+            <div className="p-3 sm:p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
               <div className="flex items-start gap-2 sm:gap-3">
-                <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500 shrink-0 mt-0.5" />
+                <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-xs sm:text-sm">
-                  Buďte při nakupování obezřetní. Dodržujte tyto zásady pro bezpečné transakce.
+                  Buďte při nákupu vybavení obezřetní. Hrajte fair play a držte se těchto zásad.
                 </p>
               </div>
             </div>
+            <h3 className="text-sm font-semibold text-foreground">Zásady</h3>
             <ul className="space-y-2 sm:space-y-3">
               {safetyTips.map((tip, index) => (
                 <li key={index} className="flex items-start gap-2 sm:gap-3">
                   <div className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-primary" />
                   </div>
-                  <span className="text-xs sm:text-sm">{tip}</span>
+                  <span className="text-xs sm:text-sm">
+                    <strong className="text-foreground font-semibold">{tip.label}:</strong>{' '}
+                    {tip.text}
+                  </span>
                 </li>
               ))}
             </ul>

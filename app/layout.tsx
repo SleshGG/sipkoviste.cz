@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
+import { CookieConsentBar } from '@/components/cookie-consent-bar'
 import './globals.css'
 
 const geistSans = Geist({ subsets: ['latin'] })
@@ -40,7 +40,7 @@ export default function RootLayout({
     <html lang="cs">
       <body className={`${geistSans.className} antialiased`}>
         {children}
-        <Analytics />
+        <CookieConsentBar />
       </body>
     </html>
   )

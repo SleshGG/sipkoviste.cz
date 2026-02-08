@@ -39,13 +39,18 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
               className="object-cover object-center transition-transform duration-300 group-hover:scale-105 mb-0 pb-0"
               priority={priority}
             />
-            <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2">
+            <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 flex flex-wrap gap-1">
               <Badge
                 variant={product.condition === 'Nové' ? 'default' : 'secondary'}
                 className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5"
               >
                 {product.condition}
               </Badge>
+              {'negotiable' in product && product.negotiable && (
+                <Badge variant="default" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5">
+                  Otevřeno nabídkám
+                </Badge>
+              )}
             </div>
             {showFavorite && onToggleFavorite && (
               <Button

@@ -56,7 +56,8 @@ export interface Review {
   id: string
   author_id: string
   profile_id: string
-  product_id: string
+  /** Po smazání inzerátu zůstane recenze, product_id bude null */
+  product_id: string | null
   rating: number
   comment: string | null
   created_at: string

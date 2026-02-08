@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { getProductById } from '@/lib/supabase/database'
-import { mockProducts } from '@/lib/data'
 import { ProductPageClient } from './product-page-client'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -25,6 +24,7 @@ async function getProduct(id: string) {
         images: (product.images && product.images.length > 0) ? product.images : [product.image || '/placeholder.svg'],
         description: product.description || '',
         specs: product.specs || {},
+        negotiable: product.negotiable ?? false,
         sold_at: product.sold_at ?? null,
         seller: {
           id: product.seller?.id || '',
@@ -38,15 +38,10 @@ async function getProduct(id: string) {
         createdAt: product.created_at,
       }
     }
-    
-    // Fallback to mock data
-    const mockProduct = mockProducts.find((p) => p.id === id)
-    return mockProduct || null
+    return null
   } catch (error) {
     console.error('Error fetching product:', error)
-    // Fallback to mock data
-    const mockProduct = mockProducts.find((p) => p.id === id)
-    return mockProduct || null
+    return null
   }
 }
 

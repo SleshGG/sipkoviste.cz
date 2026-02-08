@@ -5,6 +5,7 @@ import Image from 'next/image'
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -80,6 +81,7 @@ export function ImageLightbox({
           className="max-w-[calc(100vw-2rem)] w-auto max-h-[calc(100vh-2rem)] p-0 border-0 bg-transparent shadow-none overflow-visible"
           showCloseButton={true}
         >
+          <DialogTitle className="sr-only">{alt || 'Náhled obrázku'}</DialogTitle>
           <div className="relative flex items-center justify-center min-h-[200px] bg-black/90 rounded-lg">
             <div className="relative max-w-[calc(100vw-4rem)] max-h-[calc(100vh-5rem)] w-full h-full flex items-center justify-center">
               <Image

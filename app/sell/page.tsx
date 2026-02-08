@@ -188,7 +188,7 @@ export default function SellPage() {
         return
       }
 
-      router.push('/dashboard')
+      router.push('/listings')
     } catch (err) {
       console.error('Submit error:', err)
       const message = err instanceof Error ? err.message : 'Nepodařilo se vytvořit inzerát. Zkuste to prosím znovu.'

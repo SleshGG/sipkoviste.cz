@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Header } from '@/components/header'
 import { MobileNav } from '@/components/mobile-nav'
@@ -73,7 +72,6 @@ type BoughtItem = {
 }
 
 export default function ListingsPage() {
-  const router = useRouter()
   const [listings, setListings] = useState<Listing[]>([])
   const [bought, setBought] = useState<BoughtItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -138,7 +136,6 @@ export default function ListingsPage() {
     const result = await updateProductAction(id, { visible: newVisible })
     if (!result.error) {
       setListings((prev) => prev.map((l) => (l.id === id ? { ...l, visible: newVisible } : l)))
-      router.refresh()
     }
   }
 
@@ -155,7 +152,6 @@ export default function ListingsPage() {
     setListings((prev) => prev.filter((l) => l.id !== listingToDelete))
     setDeleteDialogOpen(false)
     setListingToDelete(null)
-    router.refresh()
   }
 
   const openReviewDialog = (item: BoughtItem) => {
@@ -184,7 +180,6 @@ export default function ListingsPage() {
     setReviewItem(null)
     setReviewRating(0)
     setReviewComment('')
-    router.refresh()
   }
 
   if (isLoading) {

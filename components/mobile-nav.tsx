@@ -2,23 +2,43 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { Home, Search, Plus, MessageCircle, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { createClient } from '@/lib/supabase/client'
 
 const navItems = [
   { href: '/', icon: Home, label: 'Domů' },
   { href: '/marketplace', icon: Search, label: 'Hledat' },
   { href: '/sell', icon: Plus, label: 'Prodat', primary: true },
-  { href: '/messages', icon: MessageCircle, label: 'Zprávy', badge: 2 },
+  { href: '/messages', icon: MessageCircle, label: 'Zprávy', showBadge: true },
   { href: '/dashboard', icon: User, label: 'Profil' },
 ]
 
 export function MobileNav() {
   const pathname = usePathname()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    let isMounted = true
+    const supabase = createClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted || !session?.user) return
+      supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', session.user.id)
+        .eq('is_read', false)
+        .then(({ count, error }) => {
+          if (isMounted && !error) setUnreadCount(count ?? 0)
+        })
+    })
+    return () => { isMounted = false }
+  }, [pathname])
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-[60] border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
       <div className="flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
           const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href.split('?')[0]))
@@ -39,6 +59,7 @@ export function MobileNav() {
             )
           }
 
+          const badgeCount = item.showBadge ? unreadCount : 0
           return (
             <Link
               key={item.href}
@@ -50,9 +71,9 @@ export function MobileNav() {
             >
               <div className="relative">
                 <Icon className="h-5 w-5" />
-                {item.badge && (
-                  <Badge className="absolute -right-2 -top-2 h-4 w-4 rounded-full p-0 text-[10px] flex items-center justify-center">
-                    {item.badge}
+                {badgeCount > 0 && (
+                  <Badge className="absolute -right-2 -top-2 h-4 w-4 min-w-4 rounded-full p-0 text-[10px] flex items-center justify-center">
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </Badge>
                 )}
               </div>

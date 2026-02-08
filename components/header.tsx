@@ -46,39 +46,39 @@ export function Header() {
     const supabase = createClient()
     let isMounted = true
 
-    const fetchUserAndProfile = async () => {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser()
+    const loadProfileAndUnread = (userId: string) => {
+      Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('messages').select('*', { count: 'exact', head: true }).eq('receiver_id', userId).eq('is_read', false),
+      ]).then(([profileRes, countRes]) => {
         if (!isMounted) return
-        setUser(user)
-        if (user) {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-          if (isMounted) setProfile(profileData)
-          fetchUnreadCount(user.id)
-        } else {
-          setUnreadMessagesCount(0)
-        }
-      } catch (err) {
-        // ignore
-      } finally {
-        if (isMounted) setIsLoading(false)
-      }
+        setProfile(profileRes.data ?? null)
+        setUnreadMessagesCount(countRes.count ?? 0)
+      })
     }
 
-    fetchUserAndProfile()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // getSession() je rychlejší – bere z lokálního úložiště, bez čekání na server
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted) return
       setUser(session?.user ?? null)
       setIsLoading(false)
       if (session?.user) {
-        const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
-        if (isMounted) setProfile(data)
-        fetchUnreadCount(session.user.id)
+        loadProfileAndUnread(session.user.id)
+      }
+    }).catch(() => {
+      if (isMounted) setIsLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return
+      setUser(session?.user ?? null)
+      setIsLoading(false)
+      if (session?.user) {
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          loadProfileAndUnread(session.user.id)
+        } else {
+          fetchUnreadCount(session.user.id)
+        }
       } else {
         setProfile(null)
         setUnreadMessagesCount(0)
@@ -112,7 +112,6 @@ export function Header() {
     setProfile(null)
     setIsLoggingOut(false)
     router.push('/')
-    router.refresh()
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -162,29 +161,24 @@ export function Header() {
             </Button>
           </Link>
           
-          {isLoading ? (
-            <Button variant="ghost" size="sm" disabled>
-              <Loader2 className="h-4 w-4 animate-spin" />
+          <Link href="/listings">
+            <Button variant="ghost" size="sm" className="gap-2">
+              <Package className="h-5 w-5" />
+              Moje inzeráty
             </Button>
-          ) : isLoggedIn ? (
-            <>
-              <Link href="/listings">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Package className="h-5 w-5" />
-                  Moje inzeráty
-                </Button>
-              </Link>
-              <Link href="/messages" className="group/msg">
-                <Button variant="ghost" size="icon" className="relative">
-                  <MessageCircle className="h-5 w-5" />
-                  {unreadMessagesCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-black bg-primary px-1 text-[10px] font-bold text-primary-foreground transition-[filter] group-hover/msg:brightness-110">
-                      {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
-                    </span>
-                  )}
-                </Button>
-              </Link>
-              <DropdownMenu>
+          </Link>
+          <Link href="/messages" className="group/msg">
+            <Button variant="ghost" size="icon" className="relative">
+              <MessageCircle className="h-5 w-5" />
+              {!isLoading && unreadMessagesCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-black bg-primary px-1 text-[10px] font-bold text-primary-foreground transition-[filter] group-hover/msg:brightness-110">
+                  {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                </span>
+              )}
+            </Button>
+          </Link>
+          {isLoggedIn ? (
+            <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
                     <User className="h-5 w-5" />
@@ -232,13 +226,14 @@ export function Header() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </>
           ) : (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="gap-2"
               onClick={() => setIsAuthDialogOpen(true)}
+              disabled={isLoading}
+              aria-label="Přihlásit se"
             >
               <User className="h-4 w-4" />
               Přihlásit se

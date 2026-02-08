@@ -380,7 +380,7 @@ function MessagesContent() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
-          <Card className="border-border bg-card overflow-hidden rounded-none sm:rounded-lg">
+          <Card className="border-border bg-card overflow-hidden rounded-none sm:rounded-lg py-0">
             <div className="flex h-[calc(100vh-180px)] sm:h-[calc(100vh-220px)] min-h-[450px] sm:min-h-[550px]">
               {/* Left Sidebar - Contacts List */}
               <div
