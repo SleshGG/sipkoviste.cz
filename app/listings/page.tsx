@@ -81,6 +81,7 @@ export default function ListingsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [listingToDelete, setListingToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [reviewedProductIds, setReviewedProductIds] = useState<Record<string, boolean>>({})
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
   const [reviewItem, setReviewItem] = useState<BoughtItem | null>(null)
@@ -143,12 +144,15 @@ export default function ListingsPage() {
 
   const handleDeleteListing = async () => {
     if (!listingToDelete) return
+    setDeleteError(null)
     setIsDeleting(true)
     const result = await deleteProductAction(listingToDelete)
-    if (!result.error) {
-      setListings((prev) => prev.filter((l) => l.id !== listingToDelete))
-    }
     setIsDeleting(false)
+    if (result.error) {
+      setDeleteError(result.error)
+      return
+    }
+    setListings((prev) => prev.filter((l) => l.id !== listingToDelete))
     setDeleteDialogOpen(false)
     setListingToDelete(null)
     router.refresh()
@@ -482,7 +486,7 @@ export default function ListingsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) { setDeleteError(null); setListingToDelete(null); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Smazat inzerát</DialogTitle>
@@ -490,6 +494,11 @@ export default function ListingsPage() {
               Opravdu chcete smazat tento inzerát? Tuto akci nelze vrátit zpět.
             </DialogDescription>
           </DialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive bg-destructive/10 rounded-md p-3">
+              {deleteError}
+            </p>
+          )}
           <div className="flex gap-3 justify-end">
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
               Zrušit

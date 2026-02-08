@@ -156,26 +156,35 @@ export async function updateProductAction(id: string, updates: Partial<ProductIn
 }
 
 export async function deleteProductAction(id: string) {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Musíte být přihlášeni' }
-  }
+  if (!UUID_REGEX.test(id)) return { error: 'Neplatné ID inzerátu.' }
 
-  const { error } = await supabase
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Musíte být přihlášeni' }
+
+  const { data: deleted, error } = await supabase
     .from('products')
     .delete()
     .eq('id', id)
-    .eq('seller_id', user.id) // Ensure user owns the product
+    .eq('seller_id', user.id)
+    .select('id')
+    .maybeSingle()
 
   if (error) {
-    console.error('Error deleting product:', error)
-    return { error: 'Nepodařilo se smazat inzerát' }
+    const code = (error as { code?: string }).code
+    if (code === '23503') {
+      return { error: 'Inzerát nelze smazat – má vazby (zprávy nebo recenze). V Supabase SQL Editor spusť jednou skript 009_cascade_product_delete.sql, poté bude mazání fungovat.' }
+    }
+    return { error: error.message || 'Nepodařilo se smazat inzerát.' }
+  }
+
+  if (!deleted) {
+    return { error: 'Inzerát nebyl nalezen nebo k němu nemáte oprávnění.' }
   }
 
   revalidatePath('/marketplace')
   revalidatePath('/dashboard')
+  revalidatePath('/listings')
   return { success: true }
 }
 
