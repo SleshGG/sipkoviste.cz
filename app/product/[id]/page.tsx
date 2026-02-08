@@ -1,0 +1,86 @@
+import type { Metadata } from 'next'
+import { getProductById } from '@/lib/supabase/database'
+import { mockProducts } from '@/lib/data'
+import { ProductPageClient } from './product-page-client'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+
+export const dynamic = 'force-dynamic'
+
+async function getProduct(id: string) {
+  try {
+    const product = await getProductById(id)
+    
+    if (product) {
+      return {
+        id: product.id,
+        name: product.name,
+        brand: product.brand,
+        price: product.price,
+        weight: product.weight || 'N/A',
+        material: product.material || 'N/A',
+        condition: product.condition,
+        category: product.category,
+        image: product.image || '',
+        images: (product.images && product.images.length > 0) ? product.images : [product.image || '/placeholder.svg'],
+        description: product.description || '',
+        specs: product.specs || {},
+        sold_at: product.sold_at ?? null,
+        seller: {
+          id: product.seller?.id || '',
+          name: product.seller?.name || 'Prodejce',
+          avatar: product.seller?.avatar_url || '',
+          rating: product.seller?.rating || 0,
+          reviewCount: product.seller?.review_count || 0,
+          memberSince: product.seller?.member_since || '',
+          responseTime: product.seller?.response_time || '',
+        },
+        createdAt: product.created_at,
+      }
+    }
+    
+    // Fallback to mock data
+    const mockProduct = mockProducts.find((p) => p.id === id)
+    return mockProduct || null
+  } catch (error) {
+    console.error('Error fetching product:', error)
+    // Fallback to mock data
+    const mockProduct = mockProducts.find((p) => p.id === id)
+    return mockProduct || null
+  }
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params
+  const product = await getProduct(id)
+  if (!product) return { title: 'Produkt nenalezen' }
+  const title = `${product.name}${product.brand ? ` – ${product.brand}` : ''}`
+  const description = product.description?.slice(0, 160) || `Inzerát: ${product.name}. Cena ${product.price} Kč.`
+  return {
+    title,
+    description,
+    openGraph: { title, description, images: product.image ? [product.image] : undefined },
+    twitter: { card: 'summary_large_image', title, description },
+  }
+}
+
+export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const product = await getProduct(id)
+
+  if (!product) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Produkt nenalezen</h1>
+          <p className="text-muted-foreground mb-4">Tento inzerát byl možná odstraněn</p>
+          <Link href="/marketplace">
+            <Button>Zpět na tržiště</Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  return <ProductPageClient product={product} />
+}
