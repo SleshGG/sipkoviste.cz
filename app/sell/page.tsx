@@ -37,6 +37,7 @@ import { brands, materials, weights, conditions } from '@/lib/data'
 import { cn } from '@/lib/utils'
 import { createProductAction, uploadProductImagesAction } from '@/lib/supabase/actions'
 import type { ProductInsert } from '@/lib/supabase/types'
+import { resizeImageFiles } from '@/lib/image-resize'
 
 const steps = [
   { id: 1, name: 'Fotky', description: 'Přidejte obrázky' },
@@ -75,6 +76,7 @@ export default function SellPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isResizingImages, setIsResizingImages] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<SellFormData>({
     images: [],
@@ -91,10 +93,15 @@ export default function SellPage() {
 
   const progress = (currentStep / steps.length) * 100
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (files) {
-      const newImages: ImageFile[] = Array.from(files).map((file) => ({
+    if (!files?.length) return
+    setIsResizingImages(true)
+    setError(null)
+    try {
+      const fileList = Array.from(files)
+      const resized = await resizeImageFiles(fileList)
+      const newImages: ImageFile[] = resized.map((file) => ({
         file,
         preview: URL.createObjectURL(file),
       }))
@@ -102,6 +109,11 @@ export default function SellPage() {
         ...prev,
         images: [...prev.images, ...newImages].slice(0, 6),
       }))
+    } catch {
+      setError('Nepodařilo se zpracovat fotky. Zkuste to znovu.')
+    } finally {
+      setIsResizingImages(false)
+      e.target.value = ''
     }
   }
 
@@ -289,8 +301,15 @@ export default function SellPage() {
               >
                 <h2 className="text-lg font-semibold mb-2">Přidat fotky</h2>
                 <p className="text-sm text-muted-foreground mb-6">
-                  Přidejte až 6 fotek. První fotka bude úvodní obrázek.
+                  Přidejte až 6 fotek. První fotka bude úvodní obrázek. Fotky se před odesláním automaticky zmenší.
                 </p>
+
+                {isResizingImages && (
+                  <p className="text-sm text-primary font-medium mb-2 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Zpracovávám fotky…
+                  </p>
+                )}
 
                 <input
                   ref={fileInputRef}
@@ -329,8 +348,10 @@ export default function SellPage() {
 
                   {formData.images.length < 6 && (
                     <button
+                      type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+                      disabled={isResizingImages}
+                      className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary transition-colors disabled:opacity-60 disabled:pointer-events-none"
                     >
                       <ImagePlus className="h-6 w-6" />
                       <span className="text-xs">Přidat fotku</span>
