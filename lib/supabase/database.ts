@@ -26,7 +26,9 @@ export async function getProducts(options?: {
         rating,
         review_count,
         member_since,
-        response_time
+        response_time,
+        show_online_status,
+        last_seen_at
       )
     `)
     .eq('visible', true)
@@ -94,7 +96,9 @@ export async function getProductById(id: string): Promise<ProductWithSeller | nu
         rating,
         review_count,
         member_since,
-        response_time
+        response_time,
+        show_online_status,
+        last_seen_at
       )
     `)
     .eq('id', id)

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { AvatarWithOnline } from '@/components/avatar-with-online'
+import { isUserOnline } from '@/lib/utils'
 import { Star, Weight, Heart, Loader2 } from 'lucide-react'
 import type { ProductWithSeller } from '@/lib/supabase/types'
 import type { Product as MockProduct } from '@/lib/data'
@@ -95,13 +97,12 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
               </span>
               {'seller' in product && product.seller && (
                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
-                  <div className="relative h-6 w-6 sm:h-7 sm:w-7 rounded-full overflow-hidden bg-secondary shrink-0">
-                    <Image
+                  <div className="overflow-visible">
+                    <AvatarWithOnline
                       src={('avatar_url' in product.seller ? product.seller.avatar_url : product.seller.avatar) || '/placeholder.svg'}
                       alt={product.seller.name ?? ''}
-                      fill
-                      sizes="28px"
-                      className="object-cover"
+                      size="xs"
+                      isOnline={'show_online_status' in product.seller && 'last_seen_at' in product.seller && isUserOnline(product.seller.show_online_status, product.seller.last_seen_at)}
                     />
                   </div>
                   <div className="flex flex-col items-start min-w-0">

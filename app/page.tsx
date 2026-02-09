@@ -32,7 +32,9 @@ export default async function HomePage() {
         rating,
         review_count,
         member_since,
-        response_time
+        response_time,
+        show_online_status,
+        last_seen_at
       )
     `)
     .eq('visible', true)

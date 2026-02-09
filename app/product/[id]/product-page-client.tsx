@@ -38,6 +38,8 @@ import type { Product as MockProduct } from '@/lib/data'
 import type { ProductWithSeller } from '@/lib/supabase/types'
 import { createClient } from '@/lib/supabase/client'
 import { sendMessageAction, getFavoriteProductIdsAction, toggleFavoriteAction } from '@/lib/supabase/actions'
+import { AvatarWithOnline } from '@/components/avatar-with-online'
+import { isUserOnline } from '@/lib/utils'
 
 type Product = ProductWithSeller | MockProduct
 
@@ -430,14 +432,12 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
               <div className="p-3 sm:p-4">
                 <h2 className="font-semibold text-sm sm:text-base mb-3 sm:mb-4">Informace o prodejci</h2>
                 <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-                  <div className="relative h-12 w-12 sm:h-14 sm:w-14 rounded-full overflow-hidden bg-secondary shrink-0">
-                    <Image
-                      src={product.seller.avatar_url ?? product.seller.avatar ?? '/placeholder.svg'}
-                      alt={product.seller.name ?? 'Prodejce'}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
+                  <AvatarWithOnline
+                    src={product.seller.avatar_url ?? product.seller.avatar ?? '/placeholder.svg'}
+                    alt={product.seller.name ?? 'Prodejce'}
+                    size="lg"
+                    isOnline={'show_online_status' in product.seller && 'last_seen_at' in product.seller && isUserOnline(product.seller.show_online_status, product.seller.last_seen_at)}
+                  />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-sm sm:text-base truncate">{product.seller.name ?? 'Prodejce'}</h3>
                     <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground">

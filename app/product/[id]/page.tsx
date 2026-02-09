@@ -34,6 +34,8 @@ async function getProduct(id: string) {
           reviewCount: product.seller?.review_count || 0,
           memberSince: product.seller?.member_since || '',
           responseTime: product.seller?.response_time || '',
+          show_online_status: product.seller?.show_online_status ?? true,
+          last_seen_at: product.seller?.last_seen_at ?? null,
         },
         createdAt: product.created_at,
       }

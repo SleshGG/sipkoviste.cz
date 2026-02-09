@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +16,7 @@ import { useState, useEffect } from 'react'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import { AuthDialog } from '@/components/auth-dialog'
+import { AvatarWithOnline } from '@/components/avatar-with-online'
 import { createClient } from '@/lib/supabase/client'
 import { signOut } from '@/lib/supabase/actions'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
@@ -186,18 +186,13 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <div className="flex items-center gap-3 p-2">
-                    <div className="relative h-10 w-10 shrink-0 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center">
-                      {profile?.avatar_url ? (
-                        <Image
-                          src={profile.avatar_url}
-                          alt={profile?.name ?? 'Profil'}
-                          fill
-                          className="object-cover"
-                          sizes="40px"
-                        />
-                      ) : (
-                        <User className="h-5 w-5 text-primary" />
-                      )}
+                    <div className="overflow-visible">
+                      <AvatarWithOnline
+                        src={profile?.avatar_url ?? '/placeholder.svg'}
+                        alt={profile?.name ?? 'Profil'}
+                        size="md"
+                        isOnline={true}
+                      />
                     </div>
                     <div>
                       <p className="text-sm font-medium">{profile?.name || 'Uživatel'}</p>
@@ -256,18 +251,13 @@ export function Header() {
             <div className="flex flex-col gap-6 pt-6 pl-3 pr-3">
               {isLoggedIn ? (
                 <div className="flex items-center gap-3 pl-4">
-                  <div className="relative h-12 w-12 shrink-0 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center">
-                    {profile?.avatar_url ? (
-                      <Image
-                        src={profile.avatar_url}
-                        alt={profile?.name ?? 'Profil'}
-                        fill
-                        className="object-cover"
-                        sizes="48px"
-                      />
-                    ) : (
-                      <User className="h-6 w-6 text-primary" />
-                    )}
+                  <div className="overflow-visible">
+                    <AvatarWithOnline
+                      src={profile?.avatar_url ?? '/placeholder.svg'}
+                      alt={profile?.name ?? 'Profil'}
+                      size="lg"
+                      isOnline={true}
+                    />
                   </div>
                   <div>
                     <p className="font-medium">{profile?.name || 'Uživatel'}</p>

@@ -27,6 +27,5 @@ export async function uploadProductImage(file: File): Promise<{ url?: string; er
     .from('product-images')
     .getPublicUrl(data.path)
 
-  console.log('[v0] Image uploaded:', publicUrl)
   return { url: publicUrl }
 }

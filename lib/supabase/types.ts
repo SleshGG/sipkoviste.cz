@@ -8,6 +8,8 @@ export interface Profile {
   review_count: number
   member_since: string
   response_time: string
+  show_online_status?: boolean
+  last_seen_at?: string | null
 }
 
 export interface Product {

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
 import { CookieConsentBar } from '@/components/cookie-consent-bar'
+import { LastSeenUpdater } from '@/components/last-seen-updater'
 import './globals.css'
 
 const geistSans = Geist({ subsets: ['latin'] })
@@ -12,7 +13,6 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')),
   title: { default: `${siteName} - Tržiště s Šipkami`, template: `%s | ${siteName}` },
   description: defaultDescription,
-  generator: 'v0.app',
   openGraph: {
     type: 'website',
     locale: 'cs_CZ',
@@ -40,6 +40,7 @@ export default function RootLayout({
     <html lang="cs">
       <body className={`${geistSans.className} antialiased`}>
         {children}
+        <LastSeenUpdater />
         <CookieConsentBar />
       </body>
     </html>

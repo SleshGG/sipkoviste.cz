@@ -19,7 +19,6 @@ import {
   Archive,
   Flag,
   Loader2,
-  User,
   CheckCircle2,
   Star,
 } from 'lucide-react'
@@ -40,6 +39,8 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase/client'
 import { sendMessageAction, markMessagesAsReadAction, confirmSaleAction, getSaleStatusAction, submitReviewAction } from '@/lib/supabase/actions'
+import { AvatarWithOnline } from '@/components/avatar-with-online'
+import { isUserOnline } from '@/lib/utils'
 import type { MessageWithRelations } from '@/lib/supabase/types'
 
 interface Conversation {
@@ -48,6 +49,8 @@ interface Conversation {
     id: string
     name: string | null
     avatar_url: string | null
+    show_online_status?: boolean
+    last_seen_at?: string | null
   }
   product: {
     id: string
@@ -128,12 +131,16 @@ function MessagesContent() {
           sender:profiles!messages_sender_id_fkey (
             id,
             name,
-            avatar_url
+            avatar_url,
+            show_online_status,
+            last_seen_at
           ),
           receiver:profiles!messages_receiver_id_fkey (
             id,
             name,
-            avatar_url
+            avatar_url,
+            show_online_status,
+            last_seen_at
           ),
           product:products!messages_product_id_fkey (
             id,
@@ -413,21 +420,13 @@ function MessagesContent() {
                         }`}
                       >
                         <div className="flex gap-2.5 sm:gap-3">
-                          <div className="relative shrink-0">
-                            <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-full overflow-hidden bg-secondary">
-                              {conv.participant.avatar_url ? (
-                                <Image
-                                  src={conv.participant.avatar_url}
-                                  alt={conv.participant.name || 'User'}
-                                  fill
-                                  className="object-cover"
-                                />
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center">
-                                  <User className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                              )}
-                            </div>
+                          <div className="relative shrink-0 overflow-visible">
+                            <AvatarWithOnline
+                              src={conv.participant.avatar_url ?? '/placeholder.svg'}
+                              alt={conv.participant.name || 'User'}
+                              size="md"
+                              isOnline={isUserOnline(conv.participant.show_online_status, conv.participant.last_seen_at)}
+                            />
                             {conv.unread && (
                               <div className="absolute -top-0.5 -right-0.5 h-3 w-3 sm:h-3.5 sm:w-3.5 rounded-full bg-primary border-2 border-card" />
                             )}
@@ -480,20 +479,12 @@ function MessagesContent() {
                         >
                           <ChevronLeft className="h-5 w-5" />
                         </button>
-                        <div className="relative h-8 w-8 sm:h-10 sm:w-10 rounded-full overflow-hidden bg-secondary shrink-0">
-                          {selectedConv.participant.avatar_url ? (
-                            <Image
-                              src={selectedConv.participant.avatar_url}
-                              alt={selectedConv.participant.name || 'User'}
-                              fill
-                              className="object-cover"
-                            />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-                        </div>
+                        <AvatarWithOnline
+                          src={selectedConv.participant.avatar_url ?? '/placeholder.svg'}
+                          alt={selectedConv.participant.name || 'User'}
+                          size="sm"
+                          isOnline={false}
+                        />
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-sm sm:text-base truncate">
                             {selectedConv.participant.name || 'Uživatel'}
@@ -581,20 +572,12 @@ function MessagesContent() {
                             className={`flex gap-2 sm:gap-3 ${msg.sender_id === currentUserId ? 'justify-end' : ''}`}
                           >
                             {msg.sender_id !== currentUserId && (
-                              <div className="relative h-7 w-7 sm:h-8 sm:w-8 rounded-full overflow-hidden bg-secondary shrink-0">
-                                {selectedConv.participant.avatar_url ? (
-                                  <Image
-                                    src={selectedConv.participant.avatar_url}
-                                    alt=""
-                                    fill
-                                    className="object-cover"
-                                  />
-                                ) : (
-                                  <div className="h-full w-full flex items-center justify-center">
-                                    <User className="h-3 w-3 text-muted-foreground" />
-                                  </div>
-                                )}
-                              </div>
+                              <AvatarWithOnline
+                                src={selectedConv.participant.avatar_url ?? '/placeholder.svg'}
+                                alt=""
+                                size="xs"
+                                isOnline={false}
+                              />
                             )}
                             <div className={`space-y-1 max-w-[80%] sm:max-w-[75%] ${msg.sender_id === currentUserId ? 'items-end' : ''}`}>
                               <div

@@ -85,6 +85,71 @@ export async function signOut() {
   return { success: true }
 }
 
+/** Ověří heslo a změní ho (volá se z klienta po ověření). */
+export async function updatePasswordAction(currentPassword: string, newPassword: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) return { error: 'Nejste přihlášeni.' }
+  const p = newPassword?.trim()
+  if (!p || p.length < 8) return { error: 'Nové heslo musí mít alespoň 8 znaků.' }
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword.trim(),
+  })
+  if (signInError) return { error: 'Aktuální heslo není správné.' }
+  const { error: updateError } = await supabase.auth.updateUser({ password: p })
+  if (updateError) return { error: updateError.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+/** Deaktivuje účet (nastaví metadata a odhlásí). */
+export async function deactivateAccountAction() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Nejste přihlášeni.' }
+  const { error } = await supabase.auth.updateUser({
+    data: { ...user.user_metadata, disabled: true },
+  })
+  if (error) return { error: error.message }
+  await supabase.auth.signOut()
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+/** Smaže účet a všechna data. Pro smazání z Auth je potřeba SUPABASE_SERVICE_ROLE_KEY. */
+export async function deleteAccountAction(password: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Nejste přihlášeni.' }
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email!,
+    password: password.trim(),
+  })
+  if (signInError) return { error: 'Heslo není správné.' }
+  const uid = user.id
+  await supabase.from('favorites').delete().eq('user_id', uid)
+  await supabase.from('confirmed_sales').delete().or(`buyer_id.eq.${uid},seller_id.eq.${uid}`)
+  await supabase.from('reviews').delete().or(`author_id.eq.${uid},profile_id.eq.${uid}`)
+  await supabase.from('messages').delete().or(`sender_id.eq.${uid},receiver_id.eq.${uid}`)
+  await supabase.from('products').delete().eq('seller_id', uid)
+  const { error: profileError } = await supabase.from('profiles').delete().eq('id', uid)
+  if (profileError) return { error: 'Nepodařilo se smazat profil. ' + profileError.message }
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (key) {
+    const { createClient: createAdmin } = await import('@supabase/supabase-js')
+    const admin = createAdmin(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      key,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+    await admin.auth.admin.deleteUser(uid)
+  }
+  await supabase.auth.signOut()
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
 // ============ PRODUCT ACTIONS ============
 
 export async function createProductAction(product: Omit<ProductInsert, 'seller_id'>) {
@@ -448,7 +513,7 @@ export async function toggleFavoriteAction(productId: string): Promise<{ isFavor
 
 // ============ PROFILE ACTIONS ============
 
-export async function updateProfileAction(updates: { name?: string; avatar_url?: string }) {
+export async function updateProfileAction(updates: { name?: string; avatar_url?: string; show_online_status?: boolean }) {
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
@@ -456,7 +521,7 @@ export async function updateProfileAction(updates: { name?: string; avatar_url?:
     return { error: 'Musíte být přihlášeni' }
   }
 
-  const toUpdate: { name?: string; avatar_url?: string } = { ...updates }
+  const toUpdate: { name?: string; avatar_url?: string; show_online_status?: boolean } = { ...updates }
   if (updates.name !== undefined) {
     const name = updates.name.trim()
     if (name.length === 1) return { error: 'Jméno musí mít alespoň 2 znaky.' }
@@ -478,6 +543,18 @@ export async function updateProfileAction(updates: { name?: string; avatar_url?:
 
   revalidatePath('/dashboard')
   return { data }
+}
+
+/** Aktualizuje čas poslední aktivity (volá se z klienta při prohlížení stránek). */
+export async function updateLastSeenAction() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Nejste přihlášeni.' }
+  await supabase
+    .from('profiles')
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq('id', user.id)
+  return { success: true }
 }
 
 // ============ IMAGE UPLOAD ============

@@ -38,13 +38,13 @@ const categoryIcons = {
 const features = [
   {
     icon: Shield,
-    title: 'Bezpečné transakce',
-    description: 'Chráněné platby a ověření prodejci',
+    title: 'Důvěryhodní prodejci',
+    description: 'Ověření prodejci s hodnocením od komunity',
   },
   {
     icon: Truck,
-    title: 'Rychlé doručení',
-    description: 'Většina položek odesílána do 24 hodin',
+    title: 'Široký výběr',
+    description: 'Stovky inzerátů šipek, terčů a příslušenství',
   },
   {
     icon: MessageCircle,
@@ -53,8 +53,8 @@ const features = [
   },
   {
     icon: Star,
-    title: 'Důvěryhodná komunita',
-    description: 'Ověřené recenze od skutečných hráčů',
+    title: 'Vše na jednom místě',
+    description: 'Filtrujte podle kategorie, značky, ceny nebo stavu',
   },
 ]
 
@@ -278,7 +278,7 @@ export function HomeClient({ featuredProducts, categoryCounts, totalProducts }: 
             transition={{ duration: 0.5, delay: 0.3 }}
           >
             <div className="text-center mb-12">
-              <h2 className="text-2xl md:text-3xl font-bold mb-2">Proč Bazar?</h2>
+              <h2 className="text-2xl md:text-3xl font-bold mb-2">Proč Šipkoviště?</h2>
               <p className="text-muted-foreground">
                 Důvěryhodné tržiště pro milovníky šipek
               </p>
