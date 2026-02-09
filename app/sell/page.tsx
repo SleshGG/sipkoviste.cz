@@ -191,7 +191,11 @@ export default function SellPage() {
       router.push('/listings')
     } catch (err) {
       console.error('Submit error:', err)
-      const message = err instanceof Error ? err.message : 'Nepodařilo se vytvořit inzerát. Zkuste to prosím znovu.'
+      const raw = err instanceof Error ? err.message : String(err)
+      const message =
+        raw.includes('unexpected response') || raw.includes('Body exceeded') || raw.includes('1MB') || raw.includes('413')
+          ? 'Obrázky jsou příliš velké nebo došlo k chybě při odesílání. Zkuste nahrát méně fotek, menší soubory a znovu to zkusit.'
+          : raw
       setError(message)
     } finally {
       setIsSubmitting(false)
