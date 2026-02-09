@@ -248,7 +248,11 @@ export function Header() {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-11/12">
+          <SheetContent 
+            side="right" 
+            className="w-11/12"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
             <div className="flex flex-col gap-6 pt-6 pl-3 pr-3">
               {isLoggedIn ? (
                 <div className="flex items-center gap-3 pl-4">
@@ -282,12 +286,15 @@ export function Header() {
                 </div>
               )}
               <form onSubmit={handleSearch} className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 <Input
                   placeholder="Hledat..."
                   className="pl-10 bg-secondary"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={(e) => {
+                    e.target.select()
+                  }}
                 />
               </form>
               <nav className="flex flex-col gap-2 px-0">

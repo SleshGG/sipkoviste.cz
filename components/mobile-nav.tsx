@@ -7,6 +7,7 @@ import { Home, Search, Plus, MessageCircle, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
+import { AuthDialog } from '@/components/auth-dialog'
 
 const navItems = [
   { href: '/', icon: Home, label: 'Domů' },
@@ -19,12 +20,16 @@ const navItems = [
 export function MobileNav() {
   const pathname = usePathname()
   const [unreadCount, setUnreadCount] = useState(0)
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
 
   useEffect(() => {
     let isMounted = true
     const supabase = createClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!isMounted || !session?.user) return
+      if (!isMounted) return
+      setIsLoggedIn(!!session?.user)
+      if (!session?.user) return
       supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
@@ -60,6 +65,27 @@ export function MobileNav() {
           }
 
           const badgeCount = item.showBadge ? unreadCount : 0
+          const isProfile = item.href === '/dashboard'
+          const shouldShowAuth = isProfile && isLoggedIn === false
+          
+          if (shouldShowAuth) {
+            return (
+              <button
+                key={item.href}
+                onClick={() => setIsAuthDialogOpen(true)}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-1 px-3 py-2 relative',
+                  isActive ? 'text-primary' : 'text-muted-foreground'
+                )}
+              >
+                <div className="relative">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </button>
+            )
+          }
+          
           return (
             <Link
               key={item.href}
@@ -82,6 +108,7 @@ export function MobileNav() {
           )
         })}
       </div>
+      <AuthDialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen} />
     </nav>
   )
 }
