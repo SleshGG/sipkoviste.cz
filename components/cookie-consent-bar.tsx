@@ -30,7 +30,7 @@ export function CookieConsentBar() {
       role="dialog"
       aria-label="Souhlas s cookies"
       className={cn(
-        'fixed bottom-4 left-4 z-50 w-[calc(100%-2rem)] max-w-lg rounded-lg border border-border bg-background/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80',
+        'fixed bottom-20 left-4 z-[70] w-[calc(100%-2rem)] max-w-lg rounded-lg border border-border bg-background/95 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80',
         'sm:bottom-5 sm:left-5'
       )}
     >
