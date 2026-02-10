@@ -14,11 +14,11 @@ export function isUserOnline(showOnlineStatus: boolean | undefined, lastSeenAt: 
   return !Number.isNaN(t) && Date.now() - t < ONLINE_WITHIN_MS
 }
 
-/** Formátuje „členem od“: podporuje jen rok (YYYY) nebo celé datum (ISO). */
+/** Vrací datum ve formátu d.m.yyyy pro text „Členem od …“. Rok (YYYY) zobrazí jako 1.1.YYYY. */
 export function formatMemberSince(value: string | null | undefined): string {
   if (!value || !value.trim()) return '—'
   const v = value.trim()
-  if (v.length === 4 && /^\d{4}$/.test(v)) return `od roku ${v}`
+  if (v.length === 4 && /^\d{4}$/.test(v)) return `1.1.${v}`
   const d = new Date(v)
   if (Number.isNaN(d.getTime())) return v
   return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`
