@@ -17,10 +17,13 @@ export function Footer() {
           </div>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <Link href="/podminky" className="hover:text-foreground transition-colors">
-              Podmínky
+              Obchodní podmínky
             </Link>
             <Link href="/soukromi" className="hover:text-foreground transition-colors">
               Soukromí
+            </Link>
+            <Link href="/cookies" className="hover:text-foreground transition-colors">
+              Cookies
             </Link>
             <Link href="/podpora" className="hover:text-foreground transition-colors">
               Podpora

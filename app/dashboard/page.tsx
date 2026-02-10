@@ -41,6 +41,7 @@ import {
   signOut,
 } from '@/lib/supabase/actions'
 import { uploadProductImage } from '@/lib/supabase/upload'
+import { formatMemberSince } from '@/lib/utils'
 import type { Profile } from '@/lib/supabase/types'
 
 function DashboardContent() {
@@ -261,15 +262,7 @@ function DashboardContent() {
                       <div className="text-center">
                         <p className="font-medium">{profile?.name || 'Uživatel'}</p>
                         <p className="text-sm text-muted-foreground">
-                          {'Člen od '}
-                          {profile?.member_since
-                            ? (profile.member_since.length === 4 && /^\d{4}$/.test(profile.member_since)
-                              ? `1.1.${profile.member_since}`
-                              : (() => {
-                                  const d = new Date(profile.member_since)
-                                  return Number.isNaN(d.getTime()) ? profile.member_since : `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`
-                                })())
-                            : ''}
+                          Členem od {formatMemberSince(profile?.member_since)}
                         </p>
                       </div>
                     </div>

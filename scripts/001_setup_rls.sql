@@ -6,25 +6,35 @@
 -- ---------------
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "profiles_select_all" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_delete_own" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_insert_own" ON public.profiles;
+
 -- Kdokoliv muze cist profily (verejne)
 CREATE POLICY "profiles_select_all" ON public.profiles
   FOR SELECT USING (true);
 
--- Uzivatel muze upravovat jen svuj profil
+-- Uzivatel muze upravovat jen svuj profil (select auth.uid() = vyhodnoceni jednou za dotaz)
 CREATE POLICY "profiles_update_own" ON public.profiles
-  FOR UPDATE USING (auth.uid() = id);
+  FOR UPDATE USING ((select auth.uid()) = id);
 
 -- Uzivatel muze smazat jen svuj profil
 CREATE POLICY "profiles_delete_own" ON public.profiles
-  FOR DELETE USING (auth.uid() = id);
+  FOR DELETE USING ((select auth.uid()) = id);
 
 -- Uzivatel muze vlozit jen svuj profil
 CREATE POLICY "profiles_insert_own" ON public.profiles
-  FOR INSERT WITH CHECK (auth.uid() = id);
+  FOR INSERT WITH CHECK ((select auth.uid()) = id);
 
 -- PRODUCTS TABLE
 -- ---------------
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "products_select_all" ON public.products;
+DROP POLICY IF EXISTS "products_insert_own" ON public.products;
+DROP POLICY IF EXISTS "products_update_own" ON public.products;
+DROP POLICY IF EXISTS "products_delete_own" ON public.products;
 
 -- Kdokoliv muze cist produkty (verejne)
 CREATE POLICY "products_select_all" ON public.products
@@ -32,35 +42,40 @@ CREATE POLICY "products_select_all" ON public.products
 
 -- Prihlaseny uzivatel muze vytvorit produkt
 CREATE POLICY "products_insert_own" ON public.products
-  FOR INSERT WITH CHECK (auth.uid() = seller_id);
+  FOR INSERT WITH CHECK ((select auth.uid()) = seller_id);
 
 -- Uzivatel muze upravovat jen sve produkty
 CREATE POLICY "products_update_own" ON public.products
-  FOR UPDATE USING (auth.uid() = seller_id);
+  FOR UPDATE USING ((select auth.uid()) = seller_id);
 
 -- Uzivatel muze mazat jen sve produkty
 CREATE POLICY "products_delete_own" ON public.products
-  FOR DELETE USING (auth.uid() = seller_id);
+  FOR DELETE USING ((select auth.uid()) = seller_id);
 
 -- MESSAGES TABLE
 -- ---------------
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "messages_select_own" ON public.messages;
+DROP POLICY IF EXISTS "messages_insert_own" ON public.messages;
+DROP POLICY IF EXISTS "messages_update_own" ON public.messages;
+DROP POLICY IF EXISTS "messages_delete_own" ON public.messages;
+
 -- Uzivatel muze cist zpravy kde je odesilatel nebo prijemce
 CREATE POLICY "messages_select_own" ON public.messages
-  FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+  FOR SELECT USING ((select auth.uid()) = sender_id OR (select auth.uid()) = receiver_id);
 
 -- Prihlaseny uzivatel muze odesilat zpravy
 CREATE POLICY "messages_insert_own" ON public.messages
-  FOR INSERT WITH CHECK (auth.uid() = sender_id);
+  FOR INSERT WITH CHECK ((select auth.uid()) = sender_id);
 
 -- Uzivatel muze upravovat jen sve odeslane zpravy
 CREATE POLICY "messages_update_own" ON public.messages
-  FOR UPDATE USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+  FOR UPDATE USING ((select auth.uid()) = sender_id OR (select auth.uid()) = receiver_id);
 
 -- Uzivatel muze mazat jen sve zpravy
 CREATE POLICY "messages_delete_own" ON public.messages
-  FOR DELETE USING (auth.uid() = sender_id);
+  FOR DELETE USING ((select auth.uid()) = sender_id);
 
 -- ===========================================
 -- Trigger pro automaticke vytvoreni profilu
@@ -80,7 +95,7 @@ BEGIN
     NULL,
     0,
     0,
-    to_char(NOW(), 'YYYY'),
+    to_char(NOW() AT TIME ZONE 'Europe/Prague', 'YYYY-MM-DD'),
     '< 2 hodiny'
   )
   ON CONFLICT (id) DO NOTHING;
@@ -102,5 +117,14 @@ CREATE TRIGGER on_auth_user_created
 -- Realtime subscriptions
 -- ===========================================
 
--- Povolit realtime pro messages
-ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+-- Povolit realtime pro messages (pouze pokud jeste neni v publikaci)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'messages'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+  END IF;
+END
+$$;

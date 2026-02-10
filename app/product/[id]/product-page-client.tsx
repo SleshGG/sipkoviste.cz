@@ -39,7 +39,7 @@ import type { ProductWithSeller } from '@/lib/supabase/types'
 import { createClient } from '@/lib/supabase/client'
 import { sendMessageAction, getFavoriteProductIdsAction, toggleFavoriteAction } from '@/lib/supabase/actions'
 import { AvatarWithOnline } from '@/components/avatar-with-online'
-import { isUserOnline } from '@/lib/utils'
+import { isUserOnline, formatMemberSince } from '@/lib/utils'
 
 type Product = ProductWithSeller | MockProduct
 
@@ -55,14 +55,6 @@ const categoryLabels: Record<string, string> = {
   'soft-darts': 'Softové šipky',
   'dartboards': 'Terče',
   'accessories': 'Příslušenství',
-}
-
-function formatMemberSince(value: string | undefined): string {
-  if (!value) return '—'
-  if (value.length === 4 && /^\d{4}$/.test(value)) return `1.1.${value}`
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`
 }
 
 interface ProductPageClientProps {
