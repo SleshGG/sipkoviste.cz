@@ -245,13 +245,14 @@ export function Header() {
           </SheetTrigger>
           <SheetContent 
             side="right" 
-            className="w-11/12"
+            className="w-11/12 flex flex-col p-0"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
-            <div className="flex flex-col gap-6 pt-6 pl-3 pr-3">
+            {/* Header: profil / přihlášení – oddělený blok */}
+            <div className="shrink-0 border-b border-border bg-muted/30 px-4 py-5">
               {isLoggedIn ? (
-                <div className="flex items-center gap-3 pl-4">
-                  <div className="overflow-visible">
+                <div className="flex items-center gap-4">
+                  <div className="overflow-visible shrink-0">
                     <AvatarWithOnline
                       src={profile?.avatar_url ?? '/placeholder.svg'}
                       alt={profile?.name ?? 'Profil'}
@@ -259,58 +260,42 @@ export function Header() {
                       isOnline={true}
                     />
                   </div>
-                  <div>
-                    <p className="font-medium">{profile?.name || 'Uživatel'}</p>
-                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground truncate">{profile?.name || 'Uživatel'}</p>
+                    <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
                   </div>
                 </div>
               ) : (
-                <div className="px-4">
-                  <Button 
-                    className="w-full gap-2" 
-                    onClick={() => setIsAuthDialogOpen(true)}
-                  >
-                    <User className="h-4 w-4" />
-                    Přihlásit se / Registrace
-                  </Button>
-                </div>
+                <Button 
+                  className="w-full gap-2 h-12" 
+                  onClick={() => setIsAuthDialogOpen(true)}
+                >
+                  <User className="h-4 w-4" />
+                  Přihlásit se / Registrace
+                </Button>
               )}
-              <form onSubmit={handleSearch} className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                <Input
-                  placeholder="Hledat..."
-                  className="pl-10 bg-secondary"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={(e) => {
-                    e.target.select()
-                  }}
-                />
-              </form>
-              <nav className="flex flex-col gap-2 px-0">
-                <Link href="/marketplace">
-                  <Button variant="ghost" className="w-full justify-start gap-2">
-                    <Target className="h-4 w-4" />
-                    Procházet tržiště
-                  </Button>
-                </Link>
-                <Link href="/sell">
-                  <Button variant="ghost" className="w-full justify-start gap-2">
-                    <Plus className="h-4 w-4" />
-                    Přidat inzerát
-                  </Button>
-                </Link>
-                {isLoggedIn && (
+            </div>
+
+            {/* Navigace – hlavní obsah menu */}
+            <nav className="flex-1 overflow-y-auto py-4 px-2">
+              <div className="flex flex-col gap-1">
+                {isLoggedIn ? (
                   <>
+                    <Link href="/dashboard">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <User className="h-5 w-5 text-muted-foreground" />
+                        Můj profil
+                      </Button>
+                    </Link>
                     <Link href="/listings">
-                      <Button variant="ghost" className="w-full justify-start gap-2">
-                        <Package className="h-4 w-4" />
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <Package className="h-5 w-5 text-muted-foreground" />
                         Moje inzeráty
                       </Button>
                     </Link>
                     <Link href="/messages">
-                      <Button variant="ghost" className="w-full justify-start gap-2 relative">
-                        <MessageCircle className="h-4 w-4" />
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg relative">
+                        <MessageCircle className="h-5 w-5 text-muted-foreground" />
                         Zprávy
                         {unreadMessagesCount > 0 && (
                           <Badge variant="default" className="ml-auto h-5 min-w-5 rounded-full border border-black px-1 text-xs">
@@ -319,28 +304,66 @@ export function Header() {
                         )}
                       </Button>
                     </Link>
-                    <Link href="/dashboard">
-                      <Button variant="ghost" className="w-full justify-start gap-2">
-                        <Settings className="h-4 w-4" />
-                        Nastavení
+                    <div className="my-2 border-t border-border" />
+                    <Link href="/marketplace">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <Target className="h-5 w-5 text-muted-foreground" />
+                        Procházet tržiště
                       </Button>
                     </Link>
+                    <Link href="/sell">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <Plus className="h-5 w-5 text-muted-foreground" />
+                        Přidat inzerát
+                      </Button>
+                    </Link>
+                    <div className="my-2 border-t border-border" />
                     <Button 
                       variant="ghost" 
-                      className="w-full justify-start gap-2 text-destructive hover:text-destructive"
+                      className="w-full justify-start gap-3 h-11 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={handleSignOut}
                       disabled={isLoggingOut}
                     >
                       {isLoggingOut ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-5 w-5 animate-spin" />
                       ) : (
-                        <LogOut className="h-4 w-4" />
+                        <LogOut className="h-5 w-5" />
                       )}
                       Odhlásit se
                     </Button>
                   </>
+                ) : (
+                  <>
+                    <Link href="/marketplace">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <Target className="h-5 w-5 text-muted-foreground" />
+                        Procházet tržiště
+                      </Button>
+                    </Link>
+                    <Link href="/sell">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <Plus className="h-5 w-5 text-muted-foreground" />
+                        Přidat inzerát
+                      </Button>
+                    </Link>
+                  </>
                 )}
-              </nav>
+              </div>
+            </nav>
+
+            {/* Vyhledávání – na konci menu (pb-20 = nad spodní navigací) */}
+            <div className="shrink-0 border-t border-border bg-muted/20 px-4 py-4 pb-20">
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Hledat</p>
+              <form onSubmit={handleSearch} className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Šipky, terče, příslušenství…"
+                  className="pl-10 h-11 bg-background border-border rounded-lg"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                />
+              </form>
             </div>
           </SheetContent>
         </Sheet>

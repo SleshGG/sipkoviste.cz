@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -19,12 +19,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { ArrowLeft, Target, CircleDot, Circle, Package, AlertCircle, Loader2 } from 'lucide-react'
+import { ArrowLeft, Target, CircleDot, Circle, Package, AlertCircle, Loader2, X, ImagePlus } from 'lucide-react'
 import { brands, materials, weights, conditions } from '@/lib/data'
 import { cn } from '@/lib/utils'
-import { updateProductAction } from '@/lib/supabase/actions'
+import { updateProductAction, uploadProductImagesAction } from '@/lib/supabase/actions'
 import { createClient } from '@/lib/supabase/client'
+import { resizeImageFiles } from '@/lib/image-resize'
 import type { Product } from '@/lib/supabase/types'
+
+const MAX_IMAGES = 6
 
 const categoryOptions = [
   { id: 'steel-darts', name: 'Ocelové šipky', icon: Target },
@@ -53,6 +56,10 @@ export default function EditListingPage() {
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
   const [negotiable, setNegotiable] = useState(false)
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([])
+  const [newImageFiles, setNewImageFiles] = useState<{ file: File; preview: string }[]>([])
+  const [isResizingImages, setIsResizingImages] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -87,18 +94,71 @@ export default function EditListingPage() {
       setDescription(data.description || '')
       setPrice(String(data.price))
       setNegotiable(data.negotiable ?? false)
+      const urls = data.images && data.images.length > 0 ? data.images : (data.image ? [data.image] : [])
+      setExistingImageUrls(urls)
       setIsLoading(false)
     }
 
     load()
   }, [id, router])
 
+  const totalImageCount = existingImageUrls.length + newImageFiles.length
+
+  const removeExistingImage = (index: number) => {
+    setExistingImageUrls((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const removeNewImage = (index: number) => {
+    setNewImageFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index)
+      URL.revokeObjectURL(prev[index].preview)
+      return next
+    })
+  }
+
+  const handleAddImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files?.length) return
+    setIsResizingImages(true)
+    setError(null)
+    try {
+      const fileList = Array.from(files)
+      const resized = await resizeImageFiles(fileList)
+      const toAdd = resized.map((file) => ({ file, preview: URL.createObjectURL(file) }))
+      setNewImageFiles((prev) => [...prev, ...toAdd].slice(0, MAX_IMAGES - existingImageUrls.length))
+    } catch {
+      setError('Nepodařilo se zpracovat fotky. Zkuste to znovu.')
+    } finally {
+      setIsResizingImages(false)
+      e.target.value = ''
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!product) return
 
+    if (totalImageCount === 0) {
+      setError('Přidejte alespoň jednu fotku.')
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
+
+    let finalUrls = [...existingImageUrls]
+
+    if (newImageFiles.length > 0) {
+      const formData = new FormData()
+      newImageFiles.forEach(({ file }) => formData.append('images', file))
+      const uploadResult = await uploadProductImagesAction(formData)
+      if (uploadResult.error) {
+        setError(uploadResult.error)
+        setIsSubmitting(false)
+        return
+      }
+      finalUrls = [...existingImageUrls, ...(uploadResult.urls ?? [])]
+    }
 
     const result = await updateProductAction(product.id, {
       name: title,
@@ -110,8 +170,8 @@ export default function EditListingPage() {
       description: description || null,
       price: parseInt(price, 10) || 0,
       negotiable,
-      image: product.image,
-      images: product.images,
+      image: finalUrls[0] ?? null,
+      images: finalUrls,
     })
 
     setIsSubmitting(false)
@@ -163,12 +223,6 @@ export default function EditListingPage() {
         <h1 className="text-2xl font-bold mb-2">Upravit inzerát</h1>
         <p className="text-muted-foreground mb-6">{product.name}</p>
 
-        {product.image && (
-          <div className="relative h-32 w-32 rounded-lg overflow-hidden bg-secondary mb-6">
-            <Image src={product.image} alt="" fill className="object-cover" />
-          </div>
-        )}
-
         {error && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive">
             <AlertCircle className="h-5 w-5 shrink-0" />
@@ -178,6 +232,85 @@ export default function EditListingPage() {
 
         <form onSubmit={handleSubmit}>
           <Card className="border-border bg-card p-6 space-y-4">
+            <div className="grid gap-2">
+              <Label>Fotky</Label>
+              <p className="text-sm text-muted-foreground mb-2">
+                První fotka je úvodní. Můžete přidat nebo odebrat (max. {MAX_IMAGES} fotek).
+              </p>
+              {isResizingImages && (
+                <p className="text-sm text-primary font-medium mb-2 flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Zpracovávám fotky…
+                </p>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleAddImages}
+              />
+              <div className="grid grid-cols-3 gap-3">
+                {existingImageUrls.map((url, index) => (
+                  <div
+                    key={`existing-${index}`}
+                    className="relative aspect-square rounded-lg overflow-hidden bg-secondary group"
+                  >
+                    <Image src={url} alt="" fill className="object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeExistingImage(index)}
+                      className="absolute top-1 right-1 h-7 w-7 rounded-full bg-background/90 hover:bg-background flex items-center justify-center shadow transition-opacity opacity-0 group-hover:opacity-100"
+                      aria-label="Odebrat fotku"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    {index === 0 && (
+                      <span className="absolute bottom-1 left-1 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
+                        Úvodní
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {newImageFiles.map((item, index) => (
+                  <div
+                    key={`new-${index}`}
+                    className="relative aspect-square rounded-lg overflow-hidden bg-secondary group"
+                  >
+                    <Image src={item.preview} alt="" fill className="object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeNewImage(index)}
+                      className="absolute top-1 right-1 h-7 w-7 rounded-full bg-background/90 hover:bg-background flex items-center justify-center shadow transition-opacity opacity-0 group-hover:opacity-100"
+                      aria-label="Odebrat fotku"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                    {existingImageUrls.length === 0 && index === 0 && (
+                      <span className="absolute bottom-1 left-1 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
+                        Úvodní
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {totalImageCount < MAX_IMAGES && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isResizingImages}
+                    className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary transition-colors disabled:opacity-60 disabled:pointer-events-none"
+                  >
+                    <ImagePlus className="h-6 w-6" />
+                    <span className="text-xs">Přidat fotku</span>
+                  </button>
+                )}
+              </div>
+              {totalImageCount === 0 && (
+                <p className="text-sm text-amber-600 dark:text-amber-500">Přidejte alespoň jednu fotku.</p>
+              )}
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="title">Název *</Label>
               <Input
