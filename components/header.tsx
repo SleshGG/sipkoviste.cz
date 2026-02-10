@@ -183,7 +183,7 @@ export function Header() {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center gap-3 self-stretch h-full min-h-0 w-56 -ml-[25px] rounded-none pl-4 pr-3 py-2 text-left hover:bg-muted/50 data-[state=open]:bg-muted/50 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors"
+                  className="flex items-center gap-3 self-stretch h-full min-h-0 w-56 -ml-4 xl:-ml-[25px] rounded-none pl-4 pr-3 py-2 text-left hover:bg-menu-bg data-[state=open]:bg-menu-bg focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors"
                   aria-label="Profil a nastavení"
                 >
                   <div className="shrink-0 overflow-visible">
@@ -201,7 +201,7 @@ export function Header() {
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" sideOffset={1} className="w-56 min-w-56 max-w-56 border-t-0 rounded-t-none bg-muted/50">
+              <DropdownMenuContent align="end" sideOffset={1} className="w-56 min-w-56 max-w-56 border-t-0 rounded-t-none bg-menu-bg">
                 <DropdownMenuItem asChild className="text-muted-foreground focus:bg-transparent focus:text-foreground hover:bg-transparent hover:text-foreground">
                   <Link href="/listings" className="flex items-center gap-2 cursor-pointer">
                     <Package className="h-4 w-4" />
@@ -233,12 +233,12 @@ export function Header() {
           ) : (
             <button
               type="button"
-              className="flex items-center gap-3 self-stretch h-full min-h-0 w-56 -ml-[25px] rounded-none pl-4 pr-3 py-2 text-left hover:bg-muted/50 focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors disabled:opacity-50"
+              className="flex items-center gap-3 self-stretch h-full min-h-0 w-56 -ml-4 xl:-ml-[25px] rounded-none pl-4 pr-3 py-2 text-left hover:bg-menu-bg focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors disabled:opacity-50"
               onClick={() => setIsAuthDialogOpen(true)}
               disabled={isLoading}
               aria-label="Přihlásit se"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-muted/30">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-menu-bg">
                 <User className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="min-w-0 hidden lg:block">
