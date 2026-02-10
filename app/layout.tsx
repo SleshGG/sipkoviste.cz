@@ -9,8 +9,11 @@ const geistSans = Geist({ subsets: ['latin'] })
 const siteName = 'Šipkoviště.cz'
 const defaultDescription = 'Kupujte a prodávejte prémiové šipky, terče a příslušenství. Největší tržiště pro milovníky šipek v ČR.'
 
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+const ogImageUrl = `${baseUrl.replace(/\/$/, '')}/og-image.png`
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')),
+  metadataBase: new URL(baseUrl),
   title: { default: `${siteName} - Tržiště s Šipkami`, template: `%s | ${siteName}` },
   description: defaultDescription,
   openGraph: {
@@ -19,13 +22,14 @@ export const metadata: Metadata = {
     siteName,
     title: `${siteName} - Tržiště s Šipkami`,
     description: defaultDescription,
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: siteName }],
+    url: baseUrl,
+    images: [{ url: ogImageUrl, width: 1200, height: 630, alt: siteName, type: 'image/png' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${siteName} - Tržiště s Šipkami`,
     description: defaultDescription,
-    images: ['/og-image.png'],
+    images: [ogImageUrl],
   },
   icons: {
     icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
