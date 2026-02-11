@@ -10,7 +10,8 @@ const siteName = 'Šipkoviště.cz'
 const defaultDescription = 'Kupujte a prodávejte prémiové šipky, terče a příslušenství. Největší tržiště pro milovníky šipek v ČR.'
 
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
-const ogImageUrl = `${baseUrl.replace(/\/$/, '')}/og-image.png`
+// Verze v URL nutí Facebook načíst nový obrázek při změně (FB drží cache)
+const ogImageUrl = `${baseUrl.replace(/\/$/, '')}/og-image.png?v=2`
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
@@ -42,8 +43,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const fbAppId = process.env.NEXT_PUBLIC_FB_APP_ID
+
   return (
     <html lang="cs">
+      <head>
+        {fbAppId && <meta property="fb:app_id" content={fbAppId} />}
+      </head>
       <body className={`${geistSans.className} antialiased`}>
         {children}
         <LastSeenUpdater />
