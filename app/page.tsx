@@ -1,6 +1,8 @@
 import dynamic from 'next/dynamic'
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import type { ProductWithSeller } from '@/lib/supabase/types'
+import { defaultOgImage, defaultOgImageUrl } from '@/lib/site-config'
 
 const HomeClient = dynamic(() => import('./home-client').then((m) => m.HomeClient), {
   loading: () => <div className="min-h-screen bg-background flex items-center justify-center" aria-hidden="true" />,
@@ -9,6 +11,26 @@ const HomeClient = dynamic(() => import('./home-client').then((m) => m.HomeClien
 
 /** Cache stránky 60 s – zlepší TTFB při opakovaných návštěvách */
 export const revalidate = 60
+
+const siteName = 'Šipkoviště.cz'
+const defaultDescription = 'Kupujte a prodávejte prémiové šipky, terče a příslušenství. Největší tržiště pro milovníky šipek v ČR.'
+
+export const metadata: Metadata = {
+  title: `${siteName} - Tržiště s Šipkami`,
+  description: defaultDescription,
+  openGraph: {
+    type: 'website',
+    title: `${siteName} - Tržiště s Šipkami`,
+    description: defaultDescription,
+    images: [defaultOgImage],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${siteName} - Tržiště s Šipkami`,
+    description: defaultDescription,
+    images: [defaultOgImageUrl],
+  },
+}
 
 const categoryNames: Record<string, string> = {
   'steel-darts': 'Ocelové šipky',
