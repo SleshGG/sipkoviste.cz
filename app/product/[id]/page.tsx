@@ -47,17 +47,28 @@ async function getProduct(id: string) {
   }
 }
 
+/** Pro og:image musí být vždy přímá URL, ne _next/image – FB crawler jinak obrázek neumí načíst. */
+function ensureDirectImageUrl(url: string): string {
+  if (url.includes('/_next/image')) {
+    const match = url.match(/[?&]url=([^&]+)/)
+    if (match) return decodeURIComponent(match[1])
+  }
+  return url
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
   const product = await getProduct(id)
   if (!product) return { title: 'Produkt nenalezen' }
   const title = `${product.name}${product.brand ? ` – ${product.brand}` : ''}`
   const description = product.description?.slice(0, 160) || `Inzerát: ${product.name}. Cena ${product.price} Kč.`
+  const rawImage = product.image ? ensureDirectImageUrl(product.image) : undefined
+  const ogImage = rawImage ? { url: rawImage, width: 1200, height: 630 } : undefined
   return {
     title,
     description,
-    openGraph: { title, description, images: product.image ? [product.image] : undefined },
-    twitter: { card: 'summary_large_image', title, description },
+    openGraph: { title, description, images: ogImage ? [ogImage] : undefined },
+    twitter: { card: 'summary_large_image', title, description, images: rawImage ? [rawImage] : undefined },
   }
 }
 
