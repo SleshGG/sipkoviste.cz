@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { getProductById } from '@/lib/supabase/database'
+import { defaultOgImage, defaultOgImageUrl } from '@/lib/site-config'
 import { ProductPageClient } from './product-page-client'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -63,12 +64,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const title = `${product.name}${product.brand ? ` – ${product.brand}` : ''}`
   const description = product.description?.slice(0, 160) || `Inzerát: ${product.name}. Cena ${product.price} Kč.`
   const rawImage = product.image ? ensureDirectImageUrl(product.image) : undefined
-  const ogImage = rawImage ? { url: rawImage, width: 1200, height: 630 } : undefined
+  const ogImage = rawImage ? { url: rawImage, width: 1200, height: 630 } : defaultOgImage
+  const twitterImage = rawImage ?? defaultOgImageUrl
   return {
     title,
     description,
-    openGraph: { title, description, images: ogImage ? [ogImage] : undefined },
-    twitter: { card: 'summary_large_image', title, description, images: rawImage ? [rawImage] : undefined },
+    openGraph: { title, description, images: [ogImage] },
+    twitter: { card: 'summary_large_image', title, description, images: [twitterImage] },
   }
 }
 

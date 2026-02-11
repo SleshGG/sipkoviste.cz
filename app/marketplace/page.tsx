@@ -3,11 +3,17 @@ import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { getProducts } from '@/lib/supabase/database'
 import type { ProductWithSeller } from '@/lib/supabase/types'
+import { defaultOgImage } from '@/lib/site-config'
 
 export const metadata: Metadata = {
   title: 'Tržiště',
   description: 'Prohlížejte inzeráty šipek, terčů a příslušenství. Filtrujte podle kategorie, značky a ceny.',
-  openGraph: { title: 'Tržiště | Šipkoviště.cz', description: 'Prohlížejte inzeráty šipek, terčů a příslušenství.' },
+  openGraph: {
+    title: 'Tržiště | Šipkoviště.cz',
+    description: 'Prohlížejte inzeráty šipek, terčů a příslušenství.',
+    images: [defaultOgImage],
+  },
+  twitter: { card: 'summary_large_image', images: [defaultOgImage.url] },
 }
 
 export const dynamic = 'force-dynamic'

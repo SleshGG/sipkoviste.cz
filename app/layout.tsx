@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
 import { CookieConsentBar } from '@/components/cookie-consent-bar'
 import { LastSeenUpdater } from '@/components/last-seen-updater'
+import { defaultOgImage, defaultOgImageUrl } from '@/lib/site-config'
 import './globals.css'
 
 const geistSans = Geist({ subsets: ['latin'] })
@@ -9,9 +10,9 @@ const geistSans = Geist({ subsets: ['latin'] })
 const siteName = 'Šipkoviště.cz'
 const defaultDescription = 'Kupujte a prodávejte prémiové šipky, terče a příslušenství. Největší tržiště pro milovníky šipek v ČR.'
 
-const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
-// Verze v URL nutí Facebook načíst nový obrázek při změně (FB drží cache)
-const ogImageUrl = `${baseUrl.replace(/\/$/, '')}/og-image.png?v=2`
+const baseUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
@@ -24,13 +25,13 @@ export const metadata: Metadata = {
     title: `${siteName} - Tržiště s Šipkami`,
     description: defaultDescription,
     url: baseUrl,
-    images: [{ url: ogImageUrl, width: 1200, height: 630, alt: siteName, type: 'image/png' }],
+    images: [defaultOgImage],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${siteName} - Tržiště s Šipkami`,
     description: defaultDescription,
-    images: [ogImageUrl],
+    images: [defaultOgImageUrl],
   },
   icons: {
     icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
