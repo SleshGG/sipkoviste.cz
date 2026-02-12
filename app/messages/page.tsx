@@ -686,15 +686,15 @@ function MessagesContent() {
                       </div>
                     </div>
 
-                    {/* Dialog pro hodnocení druhého účastníka */}
-                    <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+                    {/* Dialog pro hodnocení druhého účastníka (jen u konverzací o inzerátu) */}
+                    <Dialog open={reviewDialogOpen && !!selectedConv?.product} onOpenChange={setReviewDialogOpen}>
                       <DialogContent className="sm:max-w-md">
                         <DialogHeader>
                           <DialogTitle>
-                            {currentUserId === selectedConv.product.seller_id ? 'Ohodnotit kupujícího' : 'Ohodnotit prodejce'}
+                            {currentUserId === selectedConv?.product?.seller_id ? 'Ohodnotit kupujícího' : 'Ohodnotit prodejce'}
                           </DialogTitle>
                           <DialogDescription>
-                            Jaká byla spokojenost s {currentUserId === selectedConv.product.seller_id ? 'kupujícím' : 'prodejcem'} {selectedConv.participant.name || 'Uživatel'} u inzerátu {selectedConv.product.name}?
+                            Jaká byla spokojenost s {currentUserId === selectedConv?.product?.seller_id ? 'kupujícím' : 'prodejcem'} {selectedConv?.participant?.name || 'Uživatel'} u inzerátu {selectedConv?.product?.name ?? ''}?
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-2">
