@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AvatarWithOnline } from '@/components/avatar-with-online'
 import { isUserOnline } from '@/lib/utils'
-import { Star, Weight, Heart, Loader2 } from 'lucide-react'
+import { Star, Weight, Heart, Loader2, Eye } from 'lucide-react'
 import type { ProductWithSeller } from '@/lib/supabase/types'
 import type { Product as MockProduct } from '@/lib/data'
 import { motion } from 'framer-motion'
@@ -23,9 +23,12 @@ interface ProductCardProps {
   favoriteCount?: number
   /** První obrázek v mřížce – urychlí LCP (Core Web Vitals) */
   priority?: boolean
+  /** Zobrazit počet zobrazení (jen u vlastních inzerátů na profilu) */
+  showViewCount?: boolean
+  viewCount?: number
 }
 
-export function ProductCard({ product, index = 0, showFavorite, isFavorite, onToggleFavorite, isTogglingFavorite, favoriteCount = 0, priority }: ProductCardProps) {
+export function ProductCard({ product, index = 0, showFavorite, isFavorite, onToggleFavorite, isTogglingFavorite, favoriteCount = 0, priority, showViewCount, viewCount = 0 }: ProductCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -33,7 +36,11 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
       transition={{ duration: 0.3, delay: index * 0.05 }}
     >
       <Link href={`/product/${product.id}`}>
-        <Card className="group overflow-hidden border-border bg-card hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 py-0 h-full flex flex-col gap-1">
+        <Card className={`group overflow-hidden border-border bg-card transition-all duration-300 py-0 h-full flex flex-col gap-3 ${
+          'sold_at' in product && product.sold_at
+            ? 'opacity-75 hover:opacity-90'
+            : 'hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5'
+        }`}>
           <div className="relative aspect-[4/3] overflow-hidden bg-secondary">
             <Image
               src={product.image || "/placeholder.svg"}
@@ -44,6 +51,17 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
               priority={priority}
             />
             <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 flex flex-wrap gap-1">
+              {showViewCount && (
+                <div className="flex h-7 min-w-[28px] items-center justify-center gap-1 rounded bg-white dark:bg-white/90 px-2 text-[10px] sm:text-xs" style={{ color: '#2b2e33' }}>
+                  <Eye className="h-3 w-3 shrink-0" />
+                  <span className="tabular-nums">{viewCount}</span>
+                </div>
+              )}
+              {'sold_at' in product && product.sold_at && (
+                <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5">
+                  Prodané
+                </Badge>
+              )}
               <Badge
                 variant={product.condition === 'Nové' ? 'default' : 'secondary'}
                 className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5"
@@ -56,7 +74,7 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
                 </Badge>
               )}
             </div>
-            {showFavorite && onToggleFavorite && (
+            {showFavorite && onToggleFavorite && !('sold_at' in product && product.sold_at) && (
               <div className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 flex items-center gap-0.5 rounded-full bg-background/80 pl-2.5 pr-3 py-1 ${favoriteCount <= 0 ? 'justify-center pr-2.5' : ''}`}>
                 <Button
                   variant="ghost"
@@ -84,7 +102,7 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
               </div>
             )}
           </div>
-          <div className="p-2.5 sm:p-4 flex flex-col flex-1">
+          <div className="px-2.5 sm:px-4 pt-0.5 sm:pt-1 pb-2.5 sm:pb-4 flex flex-col flex-1">
             <div className="flex items-start justify-between gap-1 mb-1 sm:mb-2">
               <h3 className="font-semibold text-xs sm:text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors">
                 {product.name}

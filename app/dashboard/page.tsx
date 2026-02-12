@@ -203,7 +203,7 @@ function DashboardContent() {
             <h1 className="text-2xl md:text-3xl font-bold mb-1">Nastavení</h1>
             <p className="text-muted-foreground">Profil, oznámení a zabezpečení účtu</p>
           </div>
-          <Link href="/listings">
+          <Link href="/profile/me">
             <Button variant="outline" className="gap-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Moje inzeráty</span>

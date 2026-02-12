@@ -52,7 +52,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Chráněné cesty vyžadující přihlášení (middleware přesměruje nepřihlášené na /)
-  const protectedPaths = ['/dashboard', '/sell', '/messages', '/listings']
+  const protectedPaths = ['/dashboard', '/sell', '/messages', '/listings', '/profile/me', '/marketplace/oblibene']
   const isProtectedPath = protectedPaths.some((path) => 
     request.nextUrl.pathname.startsWith(path)
   )

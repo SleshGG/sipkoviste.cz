@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Home, Search, Plus, MessageCircle, User } from 'lucide-react'
+import { Home, Store, Plus, MessageCircle, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
@@ -11,10 +11,10 @@ import { AuthDialog } from '@/components/auth-dialog'
 
 const navItems = [
   { href: '/', icon: Home, label: 'Domů' },
-  { href: '/marketplace', icon: Search, label: 'Hledat' },
+  { href: '/marketplace', icon: Store, label: 'Tržiště' },
   { href: '/sell', icon: Plus, label: 'Prodat', primary: true },
   { href: '/messages', icon: MessageCircle, label: 'Zprávy', showBadge: true },
-  { href: '/dashboard', icon: User, label: 'Profil' },
+  { href: '/profile/me', icon: User, label: 'Profil' },
 ]
 
 export function MobileNav() {
@@ -65,7 +65,7 @@ export function MobileNav() {
           }
 
           const badgeCount = item.showBadge ? unreadCount : 0
-          const isProfile = item.href === '/dashboard'
+          const isProfile = item.href === '/profile/me'
           const shouldShowAuth = isProfile && isLoggedIn === false
           
           if (shouldShowAuth) {

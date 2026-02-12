@@ -152,6 +152,9 @@ export async function deleteAccountAction(password: string) {
 
 // ============ PRODUCT ACTIONS ============
 
+const VALID_CATEGORIES = ['steel-darts', 'soft-darts', 'dartboards', 'accessories'] as const
+const VALID_CONDITIONS = ['Nové', 'Jako nové', 'Dobré', 'Uspokojivé'] as const
+
 export async function createProductAction(product: Omit<ProductInsert, 'seller_id'>) {
   const supabase = await createClient()
   
@@ -162,13 +165,34 @@ export async function createProductAction(product: Omit<ProductInsert, 'seller_i
 
   const name = product.name?.trim()
   if (!name || name.length < 2) return { error: 'Název inzerátu musí mít alespoň 2 znaky.' }
+  if (name.length > 200) return { error: 'Název je příliš dlouhý.' }
   const price = Number(product.price)
   if (Number.isNaN(price) || price < 0) return { error: 'Cena musí být nezáporné číslo.' }
   if (price > 99_999_999) return { error: 'Cena je příliš vysoká.' }
+  if (!VALID_CATEGORIES.includes(product.category as (typeof VALID_CATEGORIES)[number])) {
+    return { error: 'Neplatná kategorie.' }
+  }
+  if (!VALID_CONDITIONS.includes(product.condition as (typeof VALID_CONDITIONS)[number])) {
+    return { error: 'Neplatný stav.' }
+  }
+  const brand = product.brand?.trim()
+  if (!brand || brand.length < 1) return { error: 'Zadejte značku.' }
+  if (brand.length > 100) return { error: 'Značka je příliš dlouhá.' }
+  if (product.description && product.description.length > 5000) {
+    return { error: 'Popis je příliš dlouhý.' }
+  }
+
+  const safeProduct = {
+    ...product,
+    name,
+    price,
+    brand,
+    description: product.description?.trim().slice(0, 5000) ?? null,
+  }
 
   const { data, error } = await supabase
     .from('products')
-    .insert({ ...product, name, price, seller_id: user.id })
+    .insert({ ...safeProduct, seller_id: user.id })
     .select()
     .single()
 
@@ -196,6 +220,21 @@ export async function updateProductAction(id: string, updates: Partial<ProductIn
     const p = Number(safeUpdates.price)
     if (Number.isNaN(p) || p < 0 || p > 99_999_999) return { error: 'Neplatná cena.' }
   }
+  if (safeUpdates.category !== undefined && !VALID_CATEGORIES.includes(safeUpdates.category as (typeof VALID_CATEGORIES)[number])) {
+    return { error: 'Neplatná kategorie.' }
+  }
+  if (safeUpdates.condition !== undefined && !VALID_CONDITIONS.includes(safeUpdates.condition as (typeof VALID_CONDITIONS)[number])) {
+    return { error: 'Neplatný stav.' }
+  }
+  if (safeUpdates.brand !== undefined) {
+    const b = safeUpdates.brand.trim()
+    if (b.length < 1) return { error: 'Značka nesmí být prázdná.' }
+    if (b.length > 100) return { error: 'Značka je příliš dlouhá.' }
+    safeUpdates.brand = b
+  }
+  if (safeUpdates.description !== undefined && safeUpdates.description !== null && safeUpdates.description.length > 5000) {
+    return { error: 'Popis je příliš dlouhý.' }
+  }
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -220,12 +259,28 @@ export async function updateProductAction(id: string, updates: Partial<ProductIn
   return { data }
 }
 
+/** Zvýší počet zobrazení inzerátu (volá se při zobrazení detailu). */
+export async function incrementProductViewAction(productId: string) {
+  if (!UUID_REGEX.test(productId)) return
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('increment_product_view_count', { pid: productId })
+  if (error) console.error('incrementProductViewAction:', error)
+}
+
 export async function deleteProductAction(id: string) {
   if (!UUID_REGEX.test(id)) return { error: 'Neplatné ID inzerátu.' }
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Musíte být přihlášeni' }
+
+  const [messagesRes, salesRes] = await Promise.all([
+    supabase.from('messages').select('id').eq('product_id', id).limit(1),
+    supabase.from('confirmed_sales').select('id').eq('product_id', id).limit(1),
+  ])
+  if ((messagesRes.data?.length ?? 0) > 0 || (salesRes.data?.length ?? 0) > 0) {
+    return { error: 'Inzerát nelze smazat – má zprávy nebo byl prodán. Můžete ho skrýt z tržiště.' }
+  }
 
   const { data: deleted, error } = await supabase
     .from('products')
@@ -249,13 +304,14 @@ export async function deleteProductAction(id: string) {
 
   revalidatePath('/marketplace')
   revalidatePath('/dashboard')
-  revalidatePath('/listings')
+  revalidatePath('/profile/me')
+  revalidatePath('/profile')
   return { success: true }
 }
 
 // ============ MESSAGE ACTIONS ============
 
-export async function sendMessageAction(message: Omit<MessageInsert, 'sender_id'>) {
+export async function sendMessageAction(message: Omit<MessageInsert, 'sender_id'> & { product_id?: string | null }) {
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
@@ -266,13 +322,20 @@ export async function sendMessageAction(message: Omit<MessageInsert, 'sender_id'
   const text = message.text?.trim()
   if (!text || text.length < 1) return { error: 'Zpráva nesmí být prázdná.' }
   if (text.length > 5000) return { error: 'Zpráva je příliš dlouhá.' }
-  if (!UUID_REGEX.test(message.receiver_id) || !UUID_REGEX.test(message.product_id)) {
-    return { error: 'Neplatný příjemce nebo produkt.' }
+  if (!UUID_REGEX.test(message.receiver_id)) return { error: 'Neplatný příjemce.' }
+  const productId = message.product_id ?? null
+  if (productId !== null && !UUID_REGEX.test(productId)) return { error: 'Neplatný produkt.' }
+
+  const insertData = {
+    receiver_id: message.receiver_id,
+    product_id: productId,
+    text,
+    sender_id: user.id,
   }
 
   const { data, error } = await supabase
     .from('messages')
-    .insert({ ...message, text, sender_id: user.id })
+    .insert(insertData)
     .select()
     .single()
 
@@ -285,7 +348,9 @@ export async function sendMessageAction(message: Omit<MessageInsert, 'sender_id'
   return { data }
 }
 
-export async function markMessagesAsReadAction(senderId: string, productId: string) {
+export async function markMessagesAsReadAction(senderId: string, productId: string | null) {
+  if (!UUID_REGEX.test(senderId)) return { error: 'Neplatné ID.' }
+  if (productId !== null && !UUID_REGEX.test(productId)) return { error: 'Neplatné ID.' }
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
@@ -293,12 +358,17 @@ export async function markMessagesAsReadAction(senderId: string, productId: stri
     return { error: 'Musíte být přihlášeni' }
   }
 
-  const { error } = await supabase
+  let query = supabase
     .from('messages')
     .update({ is_read: true })
     .eq('receiver_id', user.id)
     .eq('sender_id', senderId)
-    .eq('product_id', productId)
+  if (productId === null) {
+    query = query.is('product_id', null)
+  } else {
+    query = query.eq('product_id', productId)
+  }
+  const { error } = await query
 
   if (error) {
     console.error('Error marking messages as read:', error)
@@ -325,6 +395,9 @@ export async function submitReviewAction(params: {
   }
 
   const { product_id, profile_id, rating, comment } = params
+  if (!UUID_REGEX.test(product_id) || !UUID_REGEX.test(profile_id)) {
+    return { error: 'Neplatné ID produktu nebo profilu.' }
+  }
   if (rating < 1 || rating > 5) {
     return { error: 'Hodnocení musí být 1–5' }
   }
@@ -366,6 +439,9 @@ export async function confirmSaleAction(
   otherUserId: string,
   productSellerId: string
 ): Promise<{ error?: string }> {
+  if (!UUID_REGEX.test(productId) || !UUID_REGEX.test(otherUserId) || !UUID_REGEX.test(productSellerId)) {
+    return { error: 'Neplatné ID.' }
+  }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -380,6 +456,17 @@ export async function confirmSaleAction(
   const sellerId = productSellerId
   if (buyerId === sellerId) {
     return { error: 'Kupující a prodejce musí být různé osoby.' }
+  }
+
+  const { data: existingSale } = await supabase
+    .from('confirmed_sales')
+    .select('id')
+    .eq('product_id', productId)
+    .limit(1)
+    .maybeSingle()
+
+  if (existingSale) {
+    return { error: 'Inzerát byl již prodán jinému kupujícímu.' }
   }
 
   const { error } = await supabase.from('confirmed_sales').insert({
@@ -417,12 +504,15 @@ export async function confirmSaleAction(
   return {}
 }
 
-/** Stav prodeje a hodnocení: confirmed = je potvrzený prodej, canReview = může aktuální uživatel ohodnotit druhého, alreadyReviewed = už ho ohodnotil. */
+/** Stav prodeje a hodnocení: confirmed = je potvrzený prodej, canReview = může aktuální uživatel ohodnotit druhého, alreadyReviewed = už ho ohodnotil, productSoldToOther = inzerát byl prodán jinému kupujícímu. */
 export async function getSaleStatusAction(
   productId: string,
   otherUserId: string,
   productSellerId: string
-): Promise<{ confirmed: boolean; canReview: boolean; alreadyReviewed: boolean; error?: string }> {
+): Promise<{ confirmed: boolean; canReview: boolean; alreadyReviewed: boolean; productSoldToOther?: boolean; error?: string }> {
+  if (!UUID_REGEX.test(productId) || !UUID_REGEX.test(otherUserId) || !UUID_REGEX.test(productSellerId)) {
+    return { confirmed: false, canReview: false, alreadyReviewed: false }
+  }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -434,12 +524,21 @@ export async function getSaleStatusAction(
   const sale = await getConfirmedSale(productId, buyerId, sellerId)
   const confirmed = !!sale
 
+  const { data: anySale } = await supabase
+    .from('confirmed_sales')
+    .select('buyer_id')
+    .eq('product_id', productId)
+    .limit(1)
+    .maybeSingle()
+
+  const productSoldToOther = !!anySale && anySale.buyer_id !== otherUserId
+
   const existing = await getExistingReview(user.id, otherUserId, productId)
   const alreadyReviewed = !!existing
   const canResult = await canUserRateProfile(productId, user.id, otherUserId)
   const canReview = canResult.ok && !alreadyReviewed
 
-  return { confirmed, canReview, alreadyReviewed }
+  return { confirmed, canReview, alreadyReviewed, productSoldToOther }
 }
 
 /** Pro seznam koupených položek: vrací pro každý product_id, zda už aktuální uživatel (kupující) ohodnotil prodejce. */
@@ -450,9 +549,13 @@ export async function getBulkAlreadyReviewedAction(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || items.length === 0) return {}
 
+  const validItems = items.filter(
+    (item) => UUID_REGEX.test(item.product_id) && UUID_REGEX.test(item.seller_id)
+  )
+
   const result: Record<string, boolean> = {}
   await Promise.all(
-    items.map(async (item) => {
+    validItems.map(async (item) => {
       const existing = await getExistingReview(user.id, item.seller_id, item.product_id)
       result[item.product_id] = !!existing
     })
@@ -471,6 +574,7 @@ export async function getFavoriteProductIdsAction(): Promise<{ ids: string[]; er
 }
 
 export async function toggleFavoriteAction(productId: string): Promise<{ isFavorite: boolean; error?: string }> {
+  if (!UUID_REGEX.test(productId)) return { isFavorite: false, error: 'Neplatné ID inzerátu.' }
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -559,6 +663,25 @@ export async function updateLastSeenAction() {
 
 // ============ IMAGE UPLOAD ============
 
+const ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'] as const
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'] as const
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
+
+function validateImageFile(file: File): string | null {
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (!ext || !ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
+    return 'Povolené formáty: JPG, PNG, WebP.'
+  }
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return 'Neplatný typ souboru. Povolené: JPG, PNG, WebP.'
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return `Soubor je příliš velký. Max velikost: ${MAX_FILE_SIZE / 1024 / 1024} MB.`
+  }
+  if (file.size === 0) return 'Soubor je prázdný.'
+  return null
+}
+
 /** Server action: nahraje více obrázků z FormData a vrátí jejich public URL. */
 export async function uploadProductImagesAction(formData: FormData): Promise<{ urls?: string[]; error?: string }> {
   const supabase = await createClient()
@@ -578,6 +701,9 @@ export async function uploadProductImagesAction(formData: FormData): Promise<{ u
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
     if (!file?.size) continue
+
+    const validateErr = validateImageFile(file)
+    if (validateErr) return { error: validateErr }
 
     const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg'
     const fileName = `${user.id}/${Date.now()}-${i}.${fileExt}`

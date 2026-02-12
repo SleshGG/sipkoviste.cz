@@ -13,7 +13,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/dashboard', '/messages', '/listings', '/sell/'], // chráněné / soukromé
+        disallow: ['/dashboard', '/messages', '/listings', '/sell/', '/profile/me'], // chráněné / soukromé
       },
     ],
     sitemap: `${base}/sitemap.xml`,

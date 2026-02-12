@@ -56,6 +56,9 @@ export const brands = [
   'L-Style',
   'Mission',
   'Datadart',
+  'Pentathlon',
+  'One80',
+  'GOAT',
 ]
 
 export const materials = [
@@ -69,7 +72,12 @@ export const materials = [
 
 export const conditions = ['Nové', 'Jako nové', 'Dobré', 'Uspokojivé']
 
-export const weights = ['16g', '18g', '20g', '21g', '22g', '23g', '24g', '25g', '26g', '28g', '30g']
+export const weights = [
+  '16g', '16.5g', '17g', '17.5g', '18g', '18.5g', '19g', '19.5g',
+  '20g', '20.5g', '21g', '21.5g', '22g', '22.5g', '23g', '23.5g',
+  '24g', '24.5g', '25g', '25.5g', '26g', '26.5g', '27g', '27.5g',
+  '28g', '28.5g', '29g', '29.5g', '30g',
+]
 
 export const mockProducts: Product[] = [
   {

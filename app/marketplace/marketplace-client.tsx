@@ -38,7 +38,7 @@ export function MarketplaceClient({ initialProducts, favoriteCounts = {} }: Mark
   const [searchQuery, setSearchQuery] = useState(initialQuery)
   const [sortBy, setSortBy] = useState('favorites')
   const [filters, setFilters] = useState<FiltersState>({
-    priceRange: [0, 10000],
+    priceRange: [0, 50000],
     weights: [],
     materials: [],
     brands: [],
@@ -152,7 +152,7 @@ export function MarketplaceClient({ initialProducts, favoriteCounts = {} }: Mark
       active.push({ key: 'favorites-only', label: 'Oblíbené', value: 'Pouze oblíbené' })
     }
 
-    if (filters.priceRange[0] > 0 || filters.priceRange[1] < 10000) {
+    if (filters.priceRange[0] > 0 || filters.priceRange[1] < 50000) {
       active.push({
         key: 'price',
         label: 'Cena',
@@ -188,7 +188,7 @@ export function MarketplaceClient({ initialProducts, favoriteCounts = {} }: Mark
     if (filterKey === 'favorites-only') {
       setShowOnlyFavorites(false)
     } else if (filterKey === 'price') {
-      setFilters((f) => ({ ...f, priceRange: [0, 10000] }))
+      setFilters((f) => ({ ...f, priceRange: [0, 50000] }))
     } else {
       const dashIndex = filterKey.indexOf('-')
       const type = dashIndex === -1 ? filterKey : filterKey.slice(0, dashIndex)
@@ -304,7 +304,7 @@ export function MarketplaceClient({ initialProducts, favoriteCounts = {} }: Mark
                 onClick={() => {
                   setShowOnlyFavorites(false)
                   setFilters({
-                    priceRange: [0, 10000],
+                    priceRange: [0, 50000],
                     weights: [],
                     materials: [],
                     brands: [],
@@ -334,7 +334,7 @@ export function MarketplaceClient({ initialProducts, favoriteCounts = {} }: Mark
             {filteredProducts.length > 0 ? (
               <motion.div
                 layout
-                className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4"
+                className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2"
               >
                 <AnimatePresence mode="popLayout">
                   {filteredProducts.map((product, index) => (
@@ -371,7 +371,7 @@ export function MarketplaceClient({ initialProducts, favoriteCounts = {} }: Mark
                   onClick={() => {
                     setSearchQuery('')
                     setFilters({
-                      priceRange: [0, 10000],
+                      priceRange: [0, 50000],
                       weights: [],
                       materials: [],
                       brands: [],

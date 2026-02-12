@@ -91,6 +91,9 @@
   body {
     @apply bg-background text-foreground;
   }
+  a, button, [role="button"] {
+    cursor: pointer;
+  }
 }
 
 /* Container: roztažený až do 992px viewportu (bez max-width), pak max 1600px */

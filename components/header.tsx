@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Target, Search, Plus, MessageCircle, User, Menu, Settings, LogOut, Package, Loader2, ChevronDown } from 'lucide-react'
+import { Target, Search, Plus, MessageCircle, User, Menu, Settings, LogOut, Loader2, ChevronDown, Store, Heart, FileText, HelpCircle, Cookie } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
@@ -157,7 +157,7 @@ export function Header() {
           </Link>
           <span className="h-16 w-0 border-l border-border shrink-0 self-stretch" aria-hidden />
           <Link href="/marketplace" className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:no-underline transition-colors">
-            <Target className="h-4 w-4" />
+            <Store className="h-5 w-5" />
             Tržiště
           </Link>
           <span className="h-16 w-0 border-l border-border shrink-0 self-stretch" aria-hidden />
@@ -203,9 +203,9 @@ export function Header() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" sideOffset={1} className="w-56 min-w-56 max-w-56 border-t-0 rounded-t-none bg-menu-bg">
                 <DropdownMenuItem asChild className="text-muted-foreground focus:bg-transparent focus:text-foreground hover:bg-transparent hover:text-foreground">
-                  <Link href="/listings" className="flex items-center gap-2 cursor-pointer">
-                    <Package className="h-4 w-4" />
-                    Moje inzeráty
+                  <Link href="/profile/me" className="flex items-center gap-2 cursor-pointer">
+                    <User className="h-4 w-4" />
+                    Můj profil
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="text-muted-foreground focus:bg-transparent focus:text-foreground hover:bg-transparent hover:text-foreground">
@@ -293,16 +293,17 @@ export function Header() {
               <div className="flex flex-col gap-1">
                 {isLoggedIn ? (
                   <>
-                    <Link href="/dashboard">
+                    {/* 1. Účet a komunikace */}
+                    <Link href="/profile/me">
                       <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
                         <User className="h-5 w-5 text-muted-foreground" />
                         Můj profil
                       </Button>
                     </Link>
-                    <Link href="/listings">
+                    <Link href="/marketplace/oblibene">
                       <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
-                        <Package className="h-5 w-5 text-muted-foreground" />
-                        Moje inzeráty
+                        <Heart className="h-5 w-5 text-muted-foreground" />
+                        Oblíbené
                       </Button>
                     </Link>
                     <Link href="/messages">
@@ -317,9 +318,10 @@ export function Header() {
                       </Button>
                     </Link>
                     <div className="my-2 border-t border-border" />
+                    {/* 2. Tržiště */}
                     <Link href="/marketplace">
                       <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
-                        <Target className="h-5 w-5 text-muted-foreground" />
+                        <Store className="h-5 w-5 text-muted-foreground" />
                         Procházet tržiště
                       </Button>
                     </Link>
@@ -327,6 +329,38 @@ export function Header() {
                       <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
                         <Plus className="h-5 w-5 text-muted-foreground" />
                         Přidat inzerát
+                      </Button>
+                    </Link>
+                    <div className="my-2 border-t border-border" />
+                    {/* 3. Nastavení a právní */}
+                    <Link href="/dashboard">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <Settings className="h-5 w-5 text-muted-foreground" />
+                        Nastavení
+                      </Button>
+                    </Link>
+                    <Link href="/podminky">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        Obchodní podmínky
+                      </Button>
+                    </Link>
+                    <Link href="/soukromi">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        Soukromí
+                      </Button>
+                    </Link>
+                    <Link href="/cookies">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <Cookie className="h-5 w-5 text-muted-foreground" />
+                        Cookies
+                      </Button>
+                    </Link>
+                    <Link href="/podpora">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <HelpCircle className="h-5 w-5 text-muted-foreground" />
+                        Podpora
                       </Button>
                     </Link>
                     <div className="my-2 border-t border-border" />
@@ -346,9 +380,10 @@ export function Header() {
                   </>
                 ) : (
                   <>
+                    {/* Nepřihlášený */}
                     <Link href="/marketplace">
                       <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
-                        <Target className="h-5 w-5 text-muted-foreground" />
+                        <Store className="h-5 w-5 text-muted-foreground" />
                         Procházet tržiště
                       </Button>
                     </Link>
@@ -356,6 +391,37 @@ export function Header() {
                       <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
                         <Plus className="h-5 w-5 text-muted-foreground" />
                         Přidat inzerát
+                      </Button>
+                    </Link>
+                    <Link href="/marketplace/oblibene">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <Heart className="h-5 w-5 text-muted-foreground" />
+                        Oblíbené
+                      </Button>
+                    </Link>
+                    <div className="my-2 border-t border-border" />
+                    <Link href="/podminky">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        Obchodní podmínky
+                      </Button>
+                    </Link>
+                    <Link href="/soukromi">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        Soukromí
+                      </Button>
+                    </Link>
+                    <Link href="/cookies">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <Cookie className="h-5 w-5 text-muted-foreground" />
+                        Cookies
+                      </Button>
+                    </Link>
+                    <Link href="/podpora">
+                      <Button variant="ghost" className="w-full justify-start gap-3 h-11 rounded-lg">
+                        <HelpCircle className="h-5 w-5 text-muted-foreground" />
+                        Podpora
                       </Button>
                     </Link>
                   </>

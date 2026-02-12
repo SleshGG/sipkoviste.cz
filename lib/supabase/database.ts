@@ -51,7 +51,12 @@ export async function getProducts(options?: {
     query = query.lte('price', options.maxPrice)
   }
   if (options?.search) {
-    query = query.or(`name.ilike.%${options.search}%,brand.ilike.%${options.search}%,description.ilike.%${options.search}%`)
+    // Escape ILIKE wildcards (% a _) aby uživatel nemohl ovlivnit výsledky
+    const escaped = options.search
+      .replace(/\\/g, '\\\\')
+      .replace(/%/g, '\\%')
+      .replace(/_/g, '\\_')
+    query = query.or(`name.ilike.%${escaped}%,brand.ilike.%${escaped}%,description.ilike.%${escaped}%`)
   }
   if (options?.limit) {
     query = query.limit(options.limit)
@@ -198,6 +203,49 @@ export async function getProductsBySeller(sellerId: string): Promise<Product[]> 
   return data
 }
 
+/** Produkty prodejce pro zobrazení na profilu. */
+export async function getProductsBySellerForProfile(
+  sellerId: string,
+  options?: { includeSold?: boolean }
+): Promise<ProductWithSeller[]> {
+  const supabase = await createClient()
+  let query = supabase
+    .from('products')
+    .select(`
+      *,
+      seller:profiles!products_seller_id_fkey (
+        id,
+        name,
+        avatar_url,
+        rating,
+        review_count,
+        member_since,
+        response_time,
+        show_online_status,
+        last_seen_at
+      )
+    `)
+    .eq('seller_id', sellerId)
+    .eq('visible', true)
+
+  if (!options?.includeSold) {
+    query = query.is('sold_at', null).order('created_at', { ascending: false })
+  } else {
+    query = query
+      .order('sold_at', { ascending: false, nullsFirst: true })
+      .order('created_at', { ascending: false })
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching seller products for profile:', error)
+    return []
+  }
+
+  return (data ?? []) as ProductWithSeller[]
+}
+
 export async function createProduct(product: ProductInsert): Promise<Product | null> {
   const supabase = await createClient()
   
@@ -247,6 +295,26 @@ export async function deleteProduct(id: string): Promise<boolean> {
   }
 
   return true
+}
+
+/** Vrátí ID produktů, které lze smazat (nemají zprávy ani confirmed_sales). */
+export async function getProductIdsCanDelete(productIds: string[]): Promise<Set<string>> {
+  if (productIds.length === 0) return new Set()
+  const supabase = await createClient()
+
+  const [messagesRes, salesRes] = await Promise.all([
+    supabase.from('messages').select('product_id').in('product_id', productIds),
+    supabase.from('confirmed_sales').select('product_id').in('product_id', productIds),
+  ])
+
+  const hasMessages = new Set((messagesRes.data ?? []).map((r) => r.product_id))
+  const hasSales = new Set((salesRes.data ?? []).map((r) => r.product_id))
+
+  const canDelete = new Set<string>()
+  for (const id of productIds) {
+    if (!hasMessages.has(id) && !hasSales.has(id)) canDelete.add(id)
+  }
+  return canDelete
 }
 
 // ============ PROFILES ============
@@ -452,6 +520,76 @@ export async function canUserRateProfile(
   }
 
   return { ok: true }
+}
+
+/** Prodané inzeráty prodejce s informací o kupujícím. */
+export async function getSoldProductsWithBuyer(sellerId: string): Promise<Array<{
+  id: string
+  product_id: string
+  confirmed_at: string
+  product: { id: string; name: string; brand: string; price: number; condition: string; image: string | null; sold_at: string | null; view_count?: number }
+  buyer: { id: string; name: string | null; avatar_url: string | null }
+}>> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('confirmed_sales')
+    .select(`
+      id,
+      product_id,
+      confirmed_at,
+      product:products!confirmed_sales_product_id_fkey(id, name, brand, price, condition, image, sold_at, view_count),
+      buyer:profiles!confirmed_sales_buyer_id_fkey(id, name, avatar_url)
+    `)
+    .eq('seller_id', sellerId)
+    .order('confirmed_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching sold products with buyer:', error)
+    return []
+  }
+
+  return (data ?? []) as Array<{
+    id: string
+    product_id: string
+    confirmed_at: string
+    product: { id: string; name: string; brand: string; price: number; condition: string; image: string | null; sold_at: string | null; view_count?: number }
+    buyer: { id: string; name: string | null; avatar_url: string | null }
+  }>
+}
+
+/** Zakoupené položky uživatele (potvrzené prodeje). */
+export async function getPurchasedItemsForUser(buyerId: string): Promise<Array<{
+  id: string
+  product_id: string
+  confirmed_at: string
+  product: { id: string; name: string; brand: string; price: number; condition: string; image: string | null }
+  seller: { id: string; name: string | null; avatar_url: string | null }
+}>> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('confirmed_sales')
+    .select(`
+      id,
+      product_id,
+      confirmed_at,
+      product:products!confirmed_sales_product_id_fkey(id, name, brand, price, condition, image),
+      seller:profiles!confirmed_sales_seller_id_fkey(id, name, avatar_url)
+    `)
+    .eq('buyer_id', buyerId)
+    .order('confirmed_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching purchased items:', error)
+    return []
+  }
+
+  return (data ?? []) as Array<{
+    id: string
+    product_id: string
+    confirmed_at: string
+    product: { id: string; name: string; brand: string; price: number; condition: string; image: string | null }
+    seller: { id: string; name: string | null; avatar_url: string | null }
+  }>
 }
 
 export async function getConfirmedSale(

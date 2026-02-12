@@ -238,7 +238,7 @@ export function HomeClient({ featuredProducts, categoryCounts, totalProducts, fa
           </div>
 
           {featuredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 min-[736px]:grid-cols-3 min-[992px]:grid-cols-4 min-[1248px]:grid-cols-5 gap-2 sm:gap-4 md:gap-6">
+            <div className="grid grid-cols-2 min-[736px]:grid-cols-3 min-[992px]:grid-cols-4 min-[1248px]:grid-cols-5 gap-2">
               {featuredProducts.map((product, index) => (
                 <div
                   key={`featured-${product.id}-${index}`}

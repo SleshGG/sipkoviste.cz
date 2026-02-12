@@ -30,7 +30,6 @@ import {
   MapPin,
   Check,
   CheckCircle2,
-  Flag,
   Loader2,
   X,
   ChevronLeft,
@@ -492,18 +491,19 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
             </Card>
 
             {/* Seller Card */}
-            <Card className="border-border bg-card">
-              <div className="p-3 sm:p-4">
-                <h2 className="font-semibold text-sm sm:text-base mb-3 sm:mb-4">Informace o prodejci</h2>
-                <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-                  <AvatarWithOnline
-                    src={product.seller.avatar_url ?? product.seller.avatar ?? '/placeholder.svg'}
-                    alt={product.seller.name ?? 'Prodejce'}
-                    size="lg"
-                    isOnline={'show_online_status' in product.seller && 'last_seen_at' in product.seller && isUserOnline(product.seller.show_online_status, product.seller.last_seen_at)}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm sm:text-base truncate">{product.seller.name ?? 'Prodejce'}</h3>
+            <Link href={`/profile/${product.seller.id}`}>
+              <Card className="border-border bg-card hover:border-primary/50 transition-colors cursor-pointer">
+                <div className="p-3 sm:p-4">
+                  <h2 className="font-semibold text-sm sm:text-base mb-3 sm:mb-4">Informace o prodejci</h2>
+                  <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                    <AvatarWithOnline
+                      src={product.seller.avatar_url ?? product.seller.avatar ?? '/placeholder.svg'}
+                      alt={product.seller.name ?? 'Prodejce'}
+                      size="lg"
+                      isOnline={'show_online_status' in product.seller && 'last_seen_at' in product.seller && isUserOnline(product.seller.show_online_status, product.seller.last_seen_at)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm sm:text-base truncate">{product.seller.name ?? 'Prodejce'}</h3>
                     <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
                       {(product.seller.reviewCount ?? product.seller.review_count ?? 0) === 0 ? (
                         <>
@@ -535,14 +535,7 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
                 </div>
               </div>
             </Card>
-
-            {/* Report */}
-            <div className="flex items-center justify-center">
-              <Button variant="ghost" size="sm" className="text-muted-foreground gap-1.5 sm:gap-2 text-xs sm:text-sm">
-                <Flag className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Nahlásit inzerát
-              </Button>
-            </div>
+            </Link>
           </motion.div>
         </div>
       </main>

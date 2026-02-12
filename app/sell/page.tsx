@@ -200,7 +200,7 @@ export default function SellPage() {
         return
       }
 
-      router.push('/listings')
+      router.push('/profile/me')
     } catch (err) {
       console.error('Submit error:', err)
       const raw = err instanceof Error ? err.message : String(err)

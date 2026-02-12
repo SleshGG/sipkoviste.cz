@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Header } from '@/components/header'
 import { MobileNav } from '@/components/mobile-nav'
@@ -17,7 +18,6 @@ import {
   MoreVertical,
   Trash2,
   Archive,
-  Flag,
   Loader2,
   CheckCircle2,
   Star,
@@ -57,7 +57,7 @@ interface Conversation {
     name: string
     image: string | null
     seller_id?: string
-  }
+  } | null
   lastMessage: string
   timestamp: string
   unread: boolean
@@ -67,7 +67,7 @@ interface Message {
   id: string
   sender_id: string
   receiver_id: string
-  product_id: string
+  product_id: string | null
   text: string
   is_read: boolean
   created_at: string
@@ -89,6 +89,8 @@ function formatTimestamp(date: string) {
 }
 
 function MessagesContent() {
+  const searchParams = useSearchParams()
+  const toUserId = searchParams.get('to')
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -98,7 +100,7 @@ function MessagesContent() {
   const [isSending, setIsSending] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [saleStatus, setSaleStatus] = useState<{ confirmed: boolean; canReview: boolean; alreadyReviewed: boolean } | null>(null)
+  const [saleStatus, setSaleStatus] = useState<{ confirmed: boolean; canReview: boolean; alreadyReviewed: boolean; productSoldToOther?: boolean } | null>(null)
   const [isConfirmingSale, setIsConfirmingSale] = useState(false)
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
   const [reviewRating, setReviewRating] = useState(0)
@@ -166,15 +168,15 @@ function MessagesContent() {
       (messagesData ?? []).forEach((msg: MessageWithRelations) => {
         const otherUserId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id
         const otherUser = msg.sender_id === user.id ? msg.receiver : msg.sender
+        if (!otherUser) return
         const product = msg.product
-        if (!otherUser || !product) return
-        const key = `${otherUserId}::${msg.product_id}`
+        const key = msg.product_id ? `${otherUserId}::${msg.product_id}` : `${otherUserId}::general`
         
         if (!conversationsMap.has(key)) {
           conversationsMap.set(key, {
             id: key,
             participant: { id: otherUser.id, name: otherUser.name ?? null, avatar_url: otherUser.avatar_url ?? null, show_online_status: 'show_online_status' in otherUser ? otherUser.show_online_status : undefined, last_seen_at: 'last_seen_at' in otherUser ? otherUser.last_seen_at : undefined },
-            product: { id: product.id, name: product.name, image: product.image ?? null, seller_id: product.seller_id },
+            product: product ? { id: product.id, name: product.name, image: product.image ?? null, seller_id: product.seller_id } : null,
             lastMessage: msg.text,
             timestamp: msg.created_at,
             unread: !msg.is_read && msg.receiver_id === user.id
@@ -186,15 +188,31 @@ function MessagesContent() {
         setConversations([])
       }
 
-      const list = Array.from(conversationsMap.values())
-      setConversations(list)
-      // Na desktopu hned zobrazit chat s posledním uživatelem; na mobilu až po kliknutí
-      if (list.length > 0 && typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
+      let list = Array.from(conversationsMap.values())
+      const generalWithTo = toUserId ? list.find((c) => c.id === `${toUserId}::general`) : null
+      if (toUserId && !generalWithTo) {
+        const { data: profile } = await supabase.from('profiles').select('id, name, avatar_url').eq('id', toUserId).single()
+        if (profile && profile.id !== user.id) {
+          const virtualConv: Conversation = {
+            id: `${toUserId}::general`,
+            participant: { id: profile.id, name: profile.name ?? null, avatar_url: profile.avatar_url ?? null },
+            product: null,
+            lastMessage: '',
+            timestamp: new Date().toISOString(),
+            unread: false,
+          }
+          list = [virtualConv, ...list]
+          setSelectedConversation(virtualConv.id)
+        }
+      } else if (generalWithTo) {
+        setSelectedConversation(generalWithTo.id)
+      } else if (list.length > 0 && typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
         setSelectedConversation(list[0].id)
       }
+      setConversations(list)
       setIsLoading(false)
     })
-  }, [])
+  }, [toUserId])
 
   const selectedConv = conversations.find(c => c.id === selectedConversation)
 
@@ -205,24 +223,46 @@ function MessagesContent() {
     const [otherUserId, productId] = selectedConversation.split('::')
     const supabase = createClient()
 
+    const isGeneral = productId === 'general'
+    const productFilter = isGeneral ? null : productId
+
     const fetchMessages = async () => {
-      // Dva jednoduché dotazy místo složitého .or() – spolehlivě vrátí obousměrné zprávy
-      const [sent, received] = await Promise.all([
-        supabase
-          .from('messages')
-          .select('*')
-          .eq('product_id', productId)
-          .eq('sender_id', currentUserId)
-          .eq('receiver_id', otherUserId)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('messages')
-          .select('*')
-          .eq('product_id', productId)
-          .eq('sender_id', otherUserId)
-          .eq('receiver_id', currentUserId)
-          .order('created_at', { ascending: true }),
-      ])
+      let sent, received
+      if (isGeneral) {
+        [sent, received] = await Promise.all([
+          supabase
+            .from('messages')
+            .select('*')
+            .is('product_id', null)
+            .eq('sender_id', currentUserId)
+            .eq('receiver_id', otherUserId)
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('messages')
+            .select('*')
+            .is('product_id', null)
+            .eq('sender_id', otherUserId)
+            .eq('receiver_id', currentUserId)
+            .order('created_at', { ascending: true }),
+        ])
+      } else {
+        [sent, received] = await Promise.all([
+          supabase
+            .from('messages')
+            .select('*')
+            .eq('product_id', productId)
+            .eq('sender_id', currentUserId)
+            .eq('receiver_id', otherUserId)
+            .order('created_at', { ascending: true }),
+          supabase
+            .from('messages')
+            .select('*')
+            .eq('product_id', productId)
+            .eq('sender_id', otherUserId)
+            .eq('receiver_id', currentUserId)
+            .order('created_at', { ascending: true }),
+        ])
+      }
 
       const sentData = sent.data ?? []
       const receivedData = received.data ?? []
@@ -231,7 +271,7 @@ function MessagesContent() {
       )
       setMessages(merged)
       if (!sent.error && !received.error) {
-        markMessagesAsReadAction(otherUserId, productId)
+        markMessagesAsReadAction(otherUserId, isGeneral ? null : productId)
       }
     }
 
@@ -244,9 +284,16 @@ function MessagesContent() {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
-        filter: `product_id=eq.${productId}`,
+        filter: isGeneral ? 'product_id=is.null' : `product_id=eq.${productId}`,
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new as Message])
+        const newMsg = payload.new as Message
+        const inConversation = newMsg.sender_id === currentUserId
+          ? newMsg.receiver_id === otherUserId
+          : newMsg.sender_id === otherUserId
+        const isGeneralMsg = newMsg.product_id === null
+        if (inConversation && (isGeneral ? isGeneralMsg : newMsg.product_id === productId)) {
+          setMessages(prev => [...prev, newMsg])
+        }
       })
       .subscribe()
 
@@ -276,7 +323,7 @@ function MessagesContent() {
           if (!cancelled) setSaleStatus(null)
           return
         }
-        setSaleStatus({ confirmed: res.confirmed, canReview: res.canReview, alreadyReviewed: res.alreadyReviewed })
+        setSaleStatus({ confirmed: res.confirmed, canReview: res.canReview, alreadyReviewed: res.alreadyReviewed, productSoldToOther: res.productSoldToOther })
       })
     }
     run()
@@ -288,21 +335,21 @@ function MessagesContent() {
   }, [selectedConversation, currentUserId, conversations])
 
   const handleConfirmSale = async () => {
-    if (!selectedConv || !currentUserId || !selectedConv.product.seller_id) return
+    if (!selectedConv || !currentUserId || !selectedConv.product?.seller_id) return
     setIsConfirmingSale(true)
-    const err = await confirmSaleAction(selectedConv.product.id, selectedConv.participant.id, selectedConv.product.seller_id)
+    const err = await confirmSaleAction(selectedConv.product!.id, selectedConv.participant.id, selectedConv.product!.seller_id!)
     setIsConfirmingSale(false)
     if (err?.error) {
       alert(err.error)
       return
     }
-    getSaleStatusAction(selectedConv.product.id, selectedConv.participant.id, selectedConv.product.seller_id).then((res) => {
-      if (!res.error) setSaleStatus({ confirmed: res.confirmed, canReview: res.canReview, alreadyReviewed: res.alreadyReviewed })
+    getSaleStatusAction(selectedConv.product!.id, selectedConv.participant.id, selectedConv.product!.seller_id!).then((res) => {
+      if (!res.error) setSaleStatus({ confirmed: res.confirmed, canReview: res.canReview, alreadyReviewed: res.alreadyReviewed, productSoldToOther: res.productSoldToOther })
     })
   }
 
   const handleSubmitReview = async () => {
-    if (!selectedConv || reviewRating < 1 || reviewRating > 5) return
+    if (!selectedConv || !selectedConv.product || reviewRating < 1 || reviewRating > 5) return
     setIsSubmittingReview(true)
     const err = await submitReviewAction({
       product_id: selectedConv.product.id,
@@ -326,10 +373,11 @@ function MessagesContent() {
 
     setIsSending(true)
     const [otherUserId, productId] = selectedConversation!.split('::')
+    const isGeneral = productId === 'general'
 
     const result = await sendMessageAction({
       receiver_id: otherUserId,
-      product_id: productId,
+      product_id: isGeneral ? null : productId,
       text: newMessage.trim(),
     })
 
@@ -343,7 +391,7 @@ function MessagesContent() {
   const filteredConversations = conversations.filter(
     (conv) =>
       conv.participant.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.product.name?.toLowerCase().includes(searchQuery.toLowerCase())
+      (conv.product?.name ?? 'Obecná konverzace').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   if (isLoading) {
@@ -450,7 +498,7 @@ function MessagesContent() {
                               </span>
                             </div>
                             <p className="text-[10px] sm:text-xs text-primary/80 truncate mt-0.5">
-                              {conv.product.name}
+                              {conv.product?.name ?? 'Obecná konverzace'}
                             </p>
                             <p
                               className={`text-xs sm:text-sm truncate mt-1 ${conv.unread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}
@@ -497,21 +545,23 @@ function MessagesContent() {
                             {selectedConv.participant.name || 'Uživatel'}
                           </h3>
                           <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                            {selectedConv.product.name}
+                            {selectedConv.product?.name ?? 'Obecná konverzace'}
                           </p>
                         </div>
-                        <Link href={`/product/${selectedConv.product.id}`} className="shrink-0 hidden xs:block">
-                          <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-secondary border border-border hover:border-primary transition-colors">
-                            {selectedConv.product.image && (
-                              <Image
-                                src={selectedConv.product.image}
-                                alt={selectedConv.product.name}
-                                fill
-                                className="object-cover"
-                              />
-                            )}
-                          </div>
-                        </Link>
+                        {selectedConv.product && (
+                          <Link href={`/product/${selectedConv.product.id}`} className="shrink-0 hidden xs:block">
+                            <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-secondary border border-border hover:border-primary transition-colors">
+                              {selectedConv.product.image && (
+                                <Image
+                                  src={selectedConv.product.image}
+                                  alt={selectedConv.product.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              )}
+                            </div>
+                          </Link>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
@@ -523,10 +573,6 @@ function MessagesContent() {
                               <Archive className="h-4 w-4" />
                               Archivovat
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2">
-                              <Flag className="h-4 w-4" />
-                              Nahlasit
-                            </DropdownMenuItem>
                             <DropdownMenuItem className="gap-2 text-destructive">
                               <Trash2 className="h-4 w-4" />
                               Smazat konverzaci
@@ -537,9 +583,14 @@ function MessagesContent() {
                     </div>
 
                     {/* Potvrzení prodeje (jen prodejce) a hodnocení (oba účastníci) */}
-                    {selectedConv.product.seller_id && saleStatus && (
+                    {selectedConv.product?.seller_id && saleStatus && (
                       <div className="px-3 sm:px-4 py-2 border-b border-border bg-muted/30 flex flex-wrap items-center gap-2">
-                        {!saleStatus.confirmed && currentUserId === selectedConv.product.seller_id && (
+                        {saleStatus.productSoldToOther && currentUserId === selectedConv.product.seller_id && (
+                          <span className="text-sm text-muted-foreground">
+                            Inzerát byl již prodán jinému kupujícímu
+                          </span>
+                        )}
+                        {!saleStatus.confirmed && !saleStatus.productSoldToOther && currentUserId === selectedConv.product.seller_id && (
                           <Button
                             variant="outline"
                             size="sm"

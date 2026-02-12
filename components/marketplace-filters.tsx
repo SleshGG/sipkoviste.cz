@@ -69,7 +69,7 @@ function FilterContent({ filters, onFiltersChange }: MarketplaceFiltersProps) {
 
   const clearFilters = () => {
     onFiltersChange({
-      priceRange: [0, 10000],
+      priceRange: [0, 50000],
       weights: [],
       materials: [],
       brands: [],
@@ -80,7 +80,7 @@ function FilterContent({ filters, onFiltersChange }: MarketplaceFiltersProps) {
 
   const hasActiveFilters =
     filters.priceRange[0] > 0 ||
-    filters.priceRange[1] < 10000 ||
+    filters.priceRange[1] < 50000 ||
     filters.weights.length > 0 ||
     filters.materials.length > 0 ||
     filters.brands.length > 0 ||
@@ -106,7 +106,7 @@ function FilterContent({ filters, onFiltersChange }: MarketplaceFiltersProps) {
               <Slider
                 value={filters.priceRange}
                 onValueChange={handlePriceChange}
-                max={10000}
+                max={50000}
                 min={0}
                 step={100}
                 className="w-full"
@@ -240,7 +240,7 @@ export function MarketplaceFilters({ filters, onFiltersChange, isSidebar = false
   const [open, setOpen] = useState(false)
 
   const activeFilterCount =
-    (filters.priceRange[0] > 0 || filters.priceRange[1] < 10000 ? 1 : 0) +
+    (filters.priceRange[0] > 0 || filters.priceRange[1] < 50000 ? 1 : 0) +
     filters.weights.length +
     filters.materials.length +
     filters.brands.length +
