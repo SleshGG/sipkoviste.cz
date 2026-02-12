@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
+  DialogClose,
   DialogHeader,
   DialogTitle,
   DialogDescription,
@@ -27,12 +28,13 @@ import {
   Shield,
   AlertTriangle,
   MapPin,
-  ChevronLeft,
-  ChevronRight,
   Check,
   CheckCircle2,
   Flag,
   Loader2,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import type { Product as MockProduct } from '@/lib/data'
 import type { ProductWithSeller } from '@/lib/supabase/types'
@@ -59,9 +61,10 @@ const categoryLabels: Record<string, string> = {
 
 interface ProductPageClientProps {
   product: Product
+  favoriteCount?: number
 }
 
-export function ProductPageClient({ product }: ProductPageClientProps) {
+export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageClientProps) {
   const router = useRouter()
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false)
@@ -153,14 +156,6 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
 
   const images = (product.images && product.images.length > 0) ? product.images : (product.image ? [product.image] : ['/placeholder.svg'])
 
-  const nextImage = () => {
-    setSelectedImageIndex((prev) => (prev + 1) % images.length)
-  }
-
-  const prevImage = () => {
-    setSelectedImageIndex((prev) => (prev - 1 + images.length) % images.length)
-  }
-
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
       <Header />
@@ -189,99 +184,167 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
+            className="w-full lg:min-w-0"
           >
-            <Card className="overflow-hidden border-border bg-card rounded-none sm:rounded-lg">
-              <div className="relative aspect-[4/3] sm:aspect-square bg-secondary">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={selectedImageIndex}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="relative w-full h-full cursor-zoom-in"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setLightboxIndex(selectedImageIndex)
-                      setIsImageLightboxOpen(true)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
+            <div className="overflow-hidden rounded-none sm:rounded-lg">
+              {/* Mobil: jedna fotka + posuvníky */}
+              <div className="md:hidden">
+                <div className="relative aspect-[4/3] sm:aspect-square bg-secondary">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={selectedImageIndex}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="relative w-full h-full cursor-pointer focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
                         setLightboxIndex(selectedImageIndex)
                         setIsImageLightboxOpen(true)
-                      }
-                    }}
-                    aria-label="Zvětšit obrázek"
-                  >
-                    <Image
-                      src={images[selectedImageIndex] || "/placeholder.svg"}
-                      alt={product.name}
-                      fill
-                      className="object-cover"
-                      priority
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px"
-                    />
-                  </motion.div>
-                </AnimatePresence>
-
-                {/* Image Navigation */}
-                {images.length > 1 && (
-                  <>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 sm:h-10 sm:w-10 rounded-full opacity-80 hover:opacity-100 z-10"
-                      onClick={(e) => { e.stopPropagation(); prevImage() }}
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setLightboxIndex(selectedImageIndex)
+                          setIsImageLightboxOpen(true)
+                        }
+                      }}
+                      aria-label="Zvětšit obrázek"
                     >
-                      <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 sm:h-10 sm:w-10 rounded-full opacity-80 hover:opacity-100 z-10"
-                      onClick={(e) => { e.stopPropagation(); nextImage() }}
-                    >
-                      <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </Button>
-                  </>
-                )}
-
-                {/* Image Counter */}
-                <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm z-10 pointer-events-none">
-                  {selectedImageIndex + 1} / {images.length}
+                      <Image
+                        src={images[selectedImageIndex] || "/placeholder.svg"}
+                        alt={product.name}
+                        fill
+                        className="object-cover"
+                        priority
+                        sizes="100vw"
+                      />
+                    </motion.div>
+                  </AnimatePresence>
+                  {images.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedImageIndex((selectedImageIndex - 1 + images.length) % images.length)
+                        }}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 !bg-white !text-black border !border-white/50 rounded-lg p-2 flex items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90 shadow-md"
+                        aria-label="Předchozí fotka"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedImageIndex((selectedImageIndex + 1) % images.length)
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 !bg-white !text-black border !border-white/50 rounded-lg p-2 flex items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90 shadow-md"
+                        aria-label="Další fotka"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* Thumbnail Strip */}
-              {images.length > 1 && (
-                <div className="flex gap-1.5 sm:gap-2 p-2 sm:p-4 overflow-x-auto">
-                  {images.map((image, index) => (
+              {/* PC: vlevo na výšku, vpravo dvě čtverce pod sebou – 2/3 + 1/3, přes celou půlku */}
+              <div className="hidden md:block w-full">
+                {images.length === 1 ? (
+                  <div className="w-full aspect-[4/3]">
                     <button
-                      key={index}
                       onClick={() => {
-                        setSelectedImageIndex(index)
-                        setLightboxIndex(index)
+                        setSelectedImageIndex(0)
+                        setLightboxIndex(0)
                         setIsImageLightboxOpen(true)
                       }}
-                      className={`relative h-12 w-12 sm:h-16 sm:w-16 shrink-0 rounded-md sm:rounded-lg overflow-hidden border-2 transition-colors cursor-zoom-in ${
-                        index === selectedImageIndex
-                          ? 'border-primary'
-                          : 'border-transparent hover:border-border'
-                      }`}
+                      className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border-2 border-transparent cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 bg-secondary"
+                      aria-label="Fotka 1"
                     >
                       <Image
-                        src={image || "/placeholder.svg"}
-                        alt={`${product.name} ${index + 1}`}
+                        src={images[0] || "/placeholder.svg"}
+                        alt={product.name}
                         fill
                         className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 420px"
+                        priority
                       />
                     </button>
-                  ))}
-                </div>
-              )}
-            </Card>
+                  </div>
+                ) : (
+                  <div className="w-full aspect-[3/2] grid grid-cols-[2fr_1fr] grid-rows-[1fr_1fr] gap-3">
+                    {/* Vlevo: 1 fotka přes celou výšku (výška = 2 čtverce vpravo) */}
+                    <button
+                      onClick={() => {
+                        setSelectedImageIndex(0)
+                        setLightboxIndex(0)
+                        setIsImageLightboxOpen(true)
+                      }}
+                      className="relative row-span-2 min-h-0 overflow-hidden rounded-lg border-2 border-transparent cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 bg-secondary"
+                      aria-label="Fotka 1"
+                    >
+                      <Image
+                        src={images[0] || "/placeholder.svg"}
+                        alt={product.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 66vw"
+                        priority
+                      />
+                    </button>
+                    {/* Vpravo: dvě čtverce pod sebou */}
+                    {images.slice(1, 3).map((image, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setSelectedImageIndex(index + 1)
+                          setLightboxIndex(index + 1)
+                          setIsImageLightboxOpen(true)
+                        }}
+                        className="relative aspect-square w-full min-h-0 overflow-hidden rounded-lg border-2 border-transparent cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 bg-secondary"
+                        aria-label={`Fotka ${index + 2}`}
+                      >
+                        <Image
+                          src={image || "/placeholder.svg"}
+                          alt={`${product.name} ${index + 2}`}
+                          fill
+                          className="object-cover"
+                          sizes="33vw"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                  {images.length > 3 && (
+                    <div className="grid grid-cols-3 gap-3 mt-3">
+                      {images.slice(3).map((image, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setSelectedImageIndex(index + 3)
+                            setLightboxIndex(index + 3)
+                            setIsImageLightboxOpen(true)
+                          }}
+                          className="relative aspect-square w-full min-h-0 overflow-hidden rounded-lg border-2 border-transparent cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 bg-secondary"
+                          aria-label={`Fotka ${index + 4}`}
+                        >
+                          <Image
+                            src={image || "/placeholder.svg"}
+                            alt={`${product.name} ${index + 4}`}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 1024px) 33vw, 160px"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+              </div>
+            </div>
           </motion.div>
 
           {/* Product Info */}
@@ -298,21 +361,30 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
                   {product.condition}
                 </Badge>
                 <div className="flex items-center gap-1 sm:gap-2">
-                  {currentUserId && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleToggleFavorite}
-                      disabled={isTogglingFavorite}
-                      className={`h-8 w-8 sm:h-10 sm:w-10 ${isFavorited ? 'text-red-500' : ''}`}
-                      title={isFavorited ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
-                    >
-                      {isTogglingFavorite ? (
-                        <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                      ) : (
-                        <Heart className={`h-4 w-4 sm:h-5 sm:w-5 ${isFavorited ? 'fill-current' : ''}`} />
+                  {(currentUserId || favoriteCount > 0) && (
+                    <div className={`flex items-center gap-0.5 rounded-full border border-border bg-background/80 pl-2.5 pr-3 py-1 sm:pl-2.5 sm:pr-3 sm:py-1.5 ${favoriteCount <= 0 || !currentUserId ? 'justify-center pr-2.5 sm:pr-2.5' : ''}`}>
+                      {currentUserId && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleToggleFavorite}
+                          disabled={isTogglingFavorite}
+                          className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-transparent group/heart"
+                          title={isFavorited ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
+                        >
+                          {isTogglingFavorite ? (
+                            <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                          ) : (
+                            <Heart className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors ${isFavorited ? 'fill-red-500 text-red-500' : 'group-hover/heart:fill-red-500 group-hover/heart:text-red-500'}`} />
+                          )}
+                        </Button>
                       )}
-                    </Button>
+                      {favoriteCount > 0 && (
+                        <span className="text-xs sm:text-sm text-muted-foreground tabular-nums" title="Počet lidí s tímto produktem v oblíbených">
+                          {favoriteCount}
+                        </span>
+                      )}
+                    </div>
                   )}
                   <Button
                     variant="ghost"
@@ -561,49 +633,55 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Image Lightbox */}
+      {/* Image Lightbox – jen fotka, max šířka, menu viditelné, zavření ve fotce */}
       <Dialog open={isImageLightboxOpen} onOpenChange={setIsImageLightboxOpen}>
         <DialogContent
-          className="max-w-[calc(100vw-2rem)] w-auto max-h-[calc(100vh-2rem)] p-0 border-0 bg-transparent shadow-none overflow-visible"
-          closeButtonClassName="!bg-green-500 text-white rounded-full p-2 h-10 w-10 flex items-center justify-center hover:!bg-green-600 opacity-100 top-3 right-3 [&_svg]:size-5"
+          className="fixed z-40 p-0 border-0 bg-transparent shadow-none overflow-hidden focus:outline-none focus-visible:outline-none focus-visible:ring-0
+            !top-16 !bottom-0 !left-0 !right-0 !w-full !max-w-none !translate-x-0 !translate-y-0
+            !flex !items-center !justify-center
+            max-md:!bottom-16"
+          overlayClassName="!z-40 backdrop-blur-md bg-black/50"
+          showCloseButton={false}
         >
           <DialogTitle className="sr-only">Náhled obrázku inzerátu</DialogTitle>
-          <div className="relative flex items-center justify-center min-h-[200px] bg-black/90 rounded-lg">
-            <div className="relative max-w-[calc(100vw-4rem)] max-h-[calc(100vh-5rem)] w-full h-full flex items-center justify-center">
+          <div className="flex items-center justify-center w-full h-full min-w-0 min-h-0 p-4">
+            <div className="relative inline-block max-w-full max-h-full">
               <Image
                 src={images[lightboxIndex] || "/placeholder.svg"}
                 alt={product.name}
-                width={1200}
-                height={900}
-                className="object-contain max-h-[calc(100vh-5rem)] w-auto h-auto"
+                width={1920}
+                height={1080}
+                className="object-contain w-auto h-auto max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5rem)] max-md:max-h-[calc(100vh-8rem)] block"
                 unoptimized={images[lightboxIndex] === '/placeholder.svg'}
               />
+              <DialogClose
+                className="!bg-white !text-black border !border-white/50 rounded-lg px-4 py-2 flex items-center gap-2 absolute top-4 right-4 z-50 focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90"
+                aria-label="Zavřít"
+              >
+                <X className="h-4 w-4" />
+                <span className="text-sm font-medium">Zavřít</span>
+              </DialogClose>
+              {images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setLightboxIndex((lightboxIndex - 1 + images.length) % images.length)}
+                    className="flex !bg-white !text-black border !border-white/50 rounded-lg p-2 absolute left-4 top-1/2 -translate-y-1/2 z-50 items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90"
+                    aria-label="Předchozí fotka"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLightboxIndex((lightboxIndex + 1) % images.length)}
+                    className="flex !bg-white !text-black border !border-white/50 rounded-lg p-2 absolute right-4 top-1/2 -translate-y-1/2 z-50 items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90"
+                    aria-label="Další fotka"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </>
+              )}
             </div>
-            {images.length > 1 && (
-              <>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full opacity-90 hover:opacity-100"
-                  onClick={() => setLightboxIndex((i) => (i <= 0 ? images.length - 1 : i - 1))}
-                  aria-label="Předchozí obrázek"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full opacity-90 hover:opacity-100"
-                  onClick={() => setLightboxIndex((i) => (i >= images.length - 1 ? 0 : i + 1))}
-                  aria-label="Další obrázek"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </Button>
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                  {lightboxIndex + 1} / {images.length}
-                </div>
-              </>
-            )}
           </div>
         </DialogContent>
       </Dialog>

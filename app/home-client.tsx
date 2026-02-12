@@ -68,9 +68,10 @@ interface HomeClientProps {
   featuredProducts: ProductWithSeller[]
   categoryCounts: CategoryCount[]
   totalProducts: number
+  favoriteCounts?: Record<string, number>
 }
 
-export function HomeClient({ featuredProducts, categoryCounts, totalProducts }: HomeClientProps) {
+export function HomeClient({ featuredProducts, categoryCounts, totalProducts, favoriteCounts = {} }: HomeClientProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [favoriteIds, setFavoriteIds] = useState<string[]>([])
@@ -237,18 +238,27 @@ export function HomeClient({ featuredProducts, categoryCounts, totalProducts }: 
           </div>
 
           {featuredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-6">
+            <div className="grid grid-cols-2 min-[736px]:grid-cols-3 min-[992px]:grid-cols-4 min-[1248px]:grid-cols-5 gap-2 sm:gap-4 md:gap-6">
               {featuredProducts.map((product, index) => (
-                <ProductCard
+                <div
                   key={`featured-${product.id}-${index}`}
-                  product={product}
-                  index={index}
-                  showFavorite={!!currentUserId}
-                  isFavorite={favoriteIds.includes(product.id)}
-                  onToggleFavorite={handleToggleFavorite}
-                  isTogglingFavorite={togglingProductId === product.id}
-                  priority={index === 0}
-                />
+                  className={
+                    index === 2 ? 'hidden min-[736px]:block' :
+                    index === 3 ? 'hidden min-[992px]:block' :
+                    index === 4 ? 'hidden min-[1248px]:block' : ''
+                  }
+                >
+                  <ProductCard
+                    product={product}
+                    index={index}
+                    showFavorite={!!currentUserId}
+                    isFavorite={favoriteIds.includes(product.id)}
+                    onToggleFavorite={handleToggleFavorite}
+                    isTogglingFavorite={togglingProductId === product.id}
+                    favoriteCount={favoriteCounts[product.id] ?? 0}
+                    priority={index === 0}
+                  />
+                </div>
               ))}
             </div>
           ) : (

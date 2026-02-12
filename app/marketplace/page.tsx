@@ -1,7 +1,7 @@
 import nextDynamic from 'next/dynamic'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import { getProducts } from '@/lib/supabase/database'
+import { getProducts, getProductFavoriteCounts } from '@/lib/supabase/database'
 import type { ProductWithSeller } from '@/lib/supabase/types'
 import { defaultOgImage } from '@/lib/site-config'
 
@@ -35,10 +35,11 @@ async function getMarketplaceProducts(): Promise<ProductWithSeller[]> {
 
 export default async function MarketplacePage() {
   const products = await getMarketplaceProducts()
+  const favoriteCounts = products.length > 0 ? await getProductFavoriteCounts(products.map((p) => p.id)) : {}
 
   return (
     <Suspense fallback={<div className="min-h-screen bg-background" />}>
-      <MarketplaceClient initialProducts={products} />
+      <MarketplaceClient initialProducts={products} favoriteCounts={favoriteCounts} />
     </Suspense>
   )
 }

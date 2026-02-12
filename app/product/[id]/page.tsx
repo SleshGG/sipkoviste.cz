@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { getProductById } from '@/lib/supabase/database'
+import { getProductById, getProductFavoriteCounts } from '@/lib/supabase/database'
 import { defaultOgImage, defaultOgImageUrl } from '@/lib/site-config'
 import { ProductPageClient } from './product-page-client'
 import Link from 'next/link'
@@ -92,5 +92,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     )
   }
 
-  return <ProductPageClient product={product} />
+  const favoriteCounts = await getProductFavoriteCounts([id])
+  const favoriteCount = favoriteCounts[id] ?? 0
+
+  return <ProductPageClient product={product} favoriteCount={favoriteCount} />
 }

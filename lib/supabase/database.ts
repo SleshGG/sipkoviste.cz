@@ -70,6 +70,75 @@ export async function getProducts(options?: {
   return data as ProductWithSeller[]
 }
 
+/** Produkty podle ID (např. pro stránku oblíbených). */
+export async function getProductsByIds(ids: string[]): Promise<ProductWithSeller[]> {
+  if (ids.length === 0) return []
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('products')
+    .select(`
+      *,
+      seller:profiles!products_seller_id_fkey (
+        id,
+        name,
+        avatar_url,
+        rating,
+        review_count,
+        member_since,
+        response_time,
+        show_online_status,
+        last_seen_at
+      )
+    `)
+    .eq('visible', true)
+    .is('sold_at', null)
+    .in('id', ids)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching products by IDs:', error)
+    return []
+  }
+
+  // Zachovat pořadí podle ids
+  const map = new Map((data ?? []).map((p) => [p.id, p]))
+  return ids.map((id) => map.get(id)).filter(Boolean) as ProductWithSeller[]
+}
+
+/** Produkty s nejvíce srdíčky (pro doporučené inzeráty). Vrací { productId: favoriteCount }. */
+export async function getTopProductsByFavorites(limit = 4): Promise<{ productId: string; favoriteCount: number }[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('get_top_products_by_favorites', {
+    limit_count: limit,
+  })
+  if (error) {
+    console.error('Error fetching top products by favorites:', error)
+    return []
+  }
+  return (data ?? []).map((r: { product_id: string; favorite_count: number }) => ({
+    productId: r.product_id,
+    favoriteCount: Number(r.favorite_count) || 0,
+  }))
+}
+
+/** Počet oblíbených u produktů (volá DB funkci). */
+export async function getProductFavoriteCounts(productIds: string[]): Promise<Record<string, number>> {
+  if (productIds.length === 0) return {}
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('get_product_favorite_counts', {
+    product_ids: productIds,
+  })
+  if (error) {
+    console.error('Error fetching favorite counts:', error)
+    return {}
+  }
+  const result: Record<string, number> = {}
+  ;(data ?? []).forEach((r: { product_id: string; favorite_count: number }) => {
+    result[r.product_id] = Number(r.favorite_count) || 0
+  })
+  return result
+}
+
 /** Pro sitemap: vrací ID viditelných, neprodaných produktů. */
 export async function getProductIdsForSitemap(): Promise<string[]> {
   const supabase = await createClient()

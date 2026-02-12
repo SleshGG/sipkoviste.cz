@@ -19,21 +19,24 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Search, X, Package } from 'lucide-react'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import { Search, X, Package, Heart } from 'lucide-react'
 import type { ProductWithSeller } from '@/lib/supabase/types'
 
 interface MarketplaceClientProps {
   initialProducts: ProductWithSeller[]
+  favoriteCounts?: Record<string, number>
 }
 
-export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
+export function MarketplaceClient({ initialProducts, favoriteCounts = {} }: MarketplaceClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const initialCategory = searchParams.get('category')
   const initialQuery = searchParams.get('q') || ''
 
   const [searchQuery, setSearchQuery] = useState(initialQuery)
-  const [sortBy, setSortBy] = useState('newest')
+  const [sortBy, setSortBy] = useState('favorites')
   const [filters, setFilters] = useState<FiltersState>({
     priceRange: [0, 10000],
     weights: [],
@@ -45,6 +48,7 @@ export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [favoriteIds, setFavoriteIds] = useState<string[]>([])
   const [togglingProductId, setTogglingProductId] = useState<string | null>(null)
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
@@ -72,6 +76,11 @@ export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
 
   const filteredProducts = useMemo(() => {
     let products = [...initialProducts]
+
+    // Pouze oblíbené
+    if (showOnlyFavorites && currentUserId) {
+      products = products.filter((p) => favoriteIds.includes(p.id))
+    }
 
     // Search filter
     if (searchQuery) {
@@ -116,6 +125,9 @@ export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
 
     // Sorting
     switch (sortBy) {
+      case 'favorites':
+        products.sort((a, b) => (favoriteCounts[b.id] ?? 0) - (favoriteCounts[a.id] ?? 0))
+        break
       case 'price-low':
         products.sort((a, b) => a.price - b.price)
         break
@@ -131,10 +143,14 @@ export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
     }
 
     return products
-  }, [searchQuery, filters, sortBy, initialProducts])
+  }, [searchQuery, filters, sortBy, initialProducts, showOnlyFavorites, currentUserId, favoriteIds, favoriteCounts])
 
   const activeFilters = useMemo(() => {
     const active: { key: string; label: string; value: string }[] = []
+
+    if (showOnlyFavorites && currentUserId) {
+      active.push({ key: 'favorites-only', label: 'Oblíbené', value: 'Pouze oblíbené' })
+    }
 
     if (filters.priceRange[0] > 0 || filters.priceRange[1] < 10000) {
       active.push({
@@ -166,10 +182,12 @@ export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
     })
 
     return active
-  }, [filters])
+  }, [filters, showOnlyFavorites, currentUserId])
 
   const removeFilter = (filterKey: string) => {
-    if (filterKey === 'price') {
+    if (filterKey === 'favorites-only') {
+      setShowOnlyFavorites(false)
+    } else if (filterKey === 'price') {
       setFilters((f) => ({ ...f, priceRange: [0, 10000] }))
     } else {
       const dashIndex = filterKey.indexOf('-')
@@ -220,7 +238,20 @@ export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            {currentUserId && (
+              <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 bg-secondary/50">
+                <Heart className={`h-4 w-4 shrink-0 ${showOnlyFavorites ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
+                <Label htmlFor="favorites-only" className="text-sm font-medium cursor-pointer whitespace-nowrap">
+                  Pouze oblíbené
+                </Label>
+                <Switch
+                  id="favorites-only"
+                  checked={showOnlyFavorites}
+                  onCheckedChange={setShowOnlyFavorites}
+                />
+              </div>
+            )}
             {/* Mobile Filter Button - only visible on mobile/tablet */}
             <div className="lg:hidden">
               <MarketplaceFilters filters={filters} onFiltersChange={setFilters} />
@@ -230,6 +261,7 @@ export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
                 <SelectValue placeholder="Řadit podle" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="favorites">Nejoblíbenější</SelectItem>
                 <SelectItem value="newest">Nejnovější</SelectItem>
                 <SelectItem value="price-low">Cena: od nejnizsi</SelectItem>
                 <SelectItem value="price-high">Cena: od nejvyssi</SelectItem>
@@ -269,7 +301,8 @@ export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
                 variant="ghost"
                 size="sm"
                 className="h-6 text-xs"
-                onClick={() =>
+                onClick={() => {
+                  setShowOnlyFavorites(false)
                   setFilters({
                     priceRange: [0, 10000],
                     weights: [],
@@ -278,7 +311,7 @@ export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
                     conditions: [],
                     categories: [],
                   })
-                }
+                }}
               >
                 Vymazat vse
               </Button>
@@ -313,6 +346,7 @@ export function MarketplaceClient({ initialProducts }: MarketplaceClientProps) {
                       isFavorite={favoriteIds.includes(product.id)}
                       onToggleFavorite={handleToggleFavorite}
                       isTogglingFavorite={togglingProductId === product.id}
+                      favoriteCount={favoriteCounts[product.id] ?? 0}
                     />
                   ))}
                 </AnimatePresence>

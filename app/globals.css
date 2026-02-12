@@ -93,6 +93,18 @@
   }
 }
 
+/* Container: roztažený až do 992px viewportu (bez max-width), pak max 1600px */
+@layer components {
+  .container {
+    max-width: 100% !important;
+  }
+  @media (min-width: 992px) {
+    .container {
+      max-width: min(100%, 1600px) !important;
+    }
+  }
+}
+
 /* Custom Scrollbar Styles */
 * {
   scrollbar-width: thin;

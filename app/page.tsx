@@ -1,6 +1,7 @@
 import dynamic from 'next/dynamic'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
+import { getProductFavoriteCounts, getTopProductsByFavorites, getProductsByIds } from '@/lib/supabase/database'
 import type { ProductWithSeller } from '@/lib/supabase/types'
 import { defaultOgImage, defaultOgImageUrl } from '@/lib/site-config'
 
@@ -42,27 +43,107 @@ const categoryNames: Record<string, string> = {
 export default async function HomePage() {
   const supabase = await createClient()
 
-  // Fetch featured products (newest 4) – jen viditelné
-  const { data: products, error: productsError } = await supabase
-    .from('products')
-    .select(`
-      *,
-      seller:profiles!products_seller_id_fkey (
-        id,
-        name,
-        avatar_url,
-        rating,
-        review_count,
-        member_since,
-        response_time,
-        show_online_status,
-        last_seen_at
-      )
-    `)
-    .eq('visible', true)
-    .is('sold_at', null)
-    .order('created_at', { ascending: false })
-    .limit(4)
+  // Doporučené = 5 produktů (2/3/4/5 dle viewportu), primárně s nejvíce srdíčky, doplněno nejnovějšími
+  const TARGET_COUNT = 5
+  const topByFavorites = await getTopProductsByFavorites(TARGET_COUNT)
+  let featuredProducts: ProductWithSeller[] = []
+  const favoriteCounts: Record<string, number> = {}
+
+  if (topByFavorites.length > 0) {
+    const ids = topByFavorites.map((t) => t.productId)
+    topByFavorites.forEach((t) => { favoriteCounts[t.productId] = t.favoriteCount })
+    featuredProducts = await getProductsByIds(ids)
+  }
+
+  // Doplň do 5 inzerátů nejnovějšími (které ještě nejsou v seznamu)
+  if (featuredProducts.length < TARGET_COUNT) {
+    const existingIds = new Set(featuredProducts.map((p) => p.id))
+    const { data: extraProducts } = await supabase
+      .from('products')
+      .select(`
+        *,
+        seller:profiles!products_seller_id_fkey (
+          id,
+          name,
+          avatar_url,
+          rating,
+          review_count,
+          member_since,
+          response_time,
+          show_online_status,
+          last_seen_at
+        )
+      `)
+      .eq('visible', true)
+      .is('sold_at', null)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    const toAdd = (extraProducts || [])
+      .filter((p) => !existingIds.has(p.id))
+      .slice(0, TARGET_COUNT - featuredProducts.length)
+      .map((product) => ({
+        ...product,
+        seller: product.seller || {
+          id: product.seller_id,
+          name: 'Neznámý prodejce',
+          avatar_url: null,
+          rating: 5.0,
+          review_count: 0,
+          member_since: new Date().toISOString(),
+          response_time: 'Do hodiny',
+        },
+      })) as ProductWithSeller[]
+
+    featuredProducts = [...featuredProducts, ...toAdd]
+
+    if (toAdd.length > 0) {
+      const counts = await getProductFavoriteCounts(toAdd.map((p) => p.id))
+      Object.assign(favoriteCounts, counts)
+    }
+  }
+
+  // Fallback: pokud žádné srdíčka, zobraz 5 nejnovějších
+  if (featuredProducts.length === 0) {
+    const { data: products } = await supabase
+      .from('products')
+      .select(`
+        *,
+        seller:profiles!products_seller_id_fkey (
+          id,
+          name,
+          avatar_url,
+          rating,
+          review_count,
+          member_since,
+          response_time,
+          show_online_status,
+          last_seen_at
+        )
+      `)
+      .eq('visible', true)
+      .is('sold_at', null)
+      .order('created_at', { ascending: false })
+      .limit(TARGET_COUNT)
+
+    featuredProducts = (products || []).map((product) => ({
+      ...product,
+      seller: product.seller || {
+        id: product.seller_id,
+        name: 'Neznámý prodejce',
+        avatar_url: null,
+        rating: 5.0,
+        review_count: 0,
+        member_since: new Date().toISOString(),
+        response_time: 'Do hodiny',
+      },
+    })) as ProductWithSeller[]
+
+    if (featuredProducts.length > 0) {
+      const counts = await getProductFavoriteCounts(featuredProducts.map((p) => p.id))
+      Object.assign(favoriteCounts, counts)
+    }
+  }
 
   // Fetch category counts – jen viditelné
   const { data: allProducts } = await supabase
@@ -90,25 +171,12 @@ export default async function HomePage() {
 
   const totalProducts = allProducts?.length || 0
 
-  // Transform products to match the expected type
-  const featuredProducts: ProductWithSeller[] = (products || []).map((product) => ({
-    ...product,
-    seller: product.seller || {
-      id: product.seller_id,
-      name: 'Neznámý prodejce',
-      avatar_url: null,
-      rating: 5.0,
-      review_count: 0,
-      member_since: new Date().toISOString(),
-      response_time: 'Do hodiny',
-    },
-  }))
-
   return (
     <HomeClient
       featuredProducts={featuredProducts}
       categoryCounts={categoryCounts}
       totalProducts={totalProducts}
+      favoriteCounts={favoriteCounts}
     />
   )
 }

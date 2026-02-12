@@ -19,11 +19,13 @@ interface ProductCardProps {
   isFavorite?: boolean
   onToggleFavorite?: (productId: string) => void
   isTogglingFavorite?: boolean
+  /** Počet lidí, kteří mají produkt v oblíbených */
+  favoriteCount?: number
   /** První obrázek v mřížce – urychlí LCP (Core Web Vitals) */
   priority?: boolean
 }
 
-export function ProductCard({ product, index = 0, showFavorite, isFavorite, onToggleFavorite, isTogglingFavorite, priority }: ProductCardProps) {
+export function ProductCard({ product, index = 0, showFavorite, isFavorite, onToggleFavorite, isTogglingFavorite, favoriteCount = 0, priority }: ProductCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -55,24 +57,31 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
               )}
             </div>
             {showFavorite && onToggleFavorite && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-background/80 hover:bg-background/90"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  onToggleFavorite(product.id)
-                }}
-                disabled={isTogglingFavorite}
-                title={isFavorite ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
-              >
-                {isTogglingFavorite ? (
-                  <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
-                ) : (
-                  <Heart className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
+              <div className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 flex items-center gap-0.5 rounded-full bg-background/80 pl-2.5 pr-3 py-1 ${favoriteCount <= 0 ? 'justify-center pr-2.5' : ''}`}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 sm:h-7 sm:w-7 hover:bg-transparent group/heart"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onToggleFavorite(product.id)
+                  }}
+                  disabled={isTogglingFavorite}
+                  title={isFavorite ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
+                >
+                  {isTogglingFavorite ? (
+                    <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                  ) : (
+                    <Heart className={`h-3.5 w-3.5 sm:h-4 sm:w-4 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'group-hover/heart:fill-red-500 group-hover/heart:text-red-500'}`} />
+                  )}
+                </Button>
+                {favoriteCount > 0 && (
+                  <span className="text-[10px] sm:text-xs text-muted-foreground tabular-nums pl-0 pr-0">
+                    {favoriteCount}
+                  </span>
                 )}
-              </Button>
+              </div>
             )}
           </div>
           <div className="p-2.5 sm:p-4 flex flex-col flex-1">

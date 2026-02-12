@@ -162,22 +162,29 @@ function MessagesContent() {
       // Group by conversation
       const conversationsMap = new Map<string, Conversation>()
       
-      messagesData?.forEach((msg: MessageWithRelations) => {
+      try {
+      (messagesData ?? []).forEach((msg: MessageWithRelations) => {
         const otherUserId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id
         const otherUser = msg.sender_id === user.id ? msg.receiver : msg.sender
+        const product = msg.product
+        if (!otherUser || !product) return
         const key = `${otherUserId}::${msg.product_id}`
         
         if (!conversationsMap.has(key)) {
           conversationsMap.set(key, {
             id: key,
-            participant: otherUser,
-            product: msg.product,
+            participant: { id: otherUser.id, name: otherUser.name ?? null, avatar_url: otherUser.avatar_url ?? null, show_online_status: 'show_online_status' in otherUser ? otherUser.show_online_status : undefined, last_seen_at: 'last_seen_at' in otherUser ? otherUser.last_seen_at : undefined },
+            product: { id: product.id, name: product.name, image: product.image ?? null, seller_id: product.seller_id },
             lastMessage: msg.text,
             timestamp: msg.created_at,
             unread: !msg.is_read && msg.receiver_id === user.id
           })
         }
       })
+      } catch (err) {
+        console.error('Error processing conversations:', err)
+        setConversations([])
+      }
 
       const list = Array.from(conversationsMap.values())
       setConversations(list)
@@ -336,7 +343,7 @@ function MessagesContent() {
   const filteredConversations = conversations.filter(
     (conv) =>
       conv.participant.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.product.name.toLowerCase().includes(searchQuery.toLowerCase())
+      conv.product.name?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   if (isLoading) {
