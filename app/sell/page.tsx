@@ -32,6 +32,7 @@ import {
   Package,
   AlertCircle,
   Loader2,
+  Star,
 } from 'lucide-react'
 import { brands, materials, weights, conditions } from '@/lib/data'
 import { cn } from '@/lib/utils'
@@ -45,6 +46,8 @@ const steps = [
   { id: 3, name: 'Detaily', description: 'Specifikace položky' },
   { id: 4, name: 'Cena', description: 'Nastavte cenu' },
 ]
+
+const MAX_IMAGES = 6
 
 const categoryOptions = [
   { id: 'steel-darts', name: 'Ocelové šipky', icon: Target, description: 'Ocelové hroty pro sisalové terče' },
@@ -107,7 +110,7 @@ export default function SellPage() {
       }))
       setFormData((prev) => ({
         ...prev,
-        images: [...prev.images, ...newImages].slice(0, 6),
+        images: [...prev.images, ...newImages].slice(0, MAX_IMAGES),
       }))
     } catch {
       setError('Nepodařilo se zpracovat fotky. Zkuste to znovu.')
@@ -124,6 +127,53 @@ export default function SellPage() {
       ...prev,
       images: prev.images.filter((_, i) => i !== index),
     }))
+  }
+
+  const setAsMainImage = (index: number) => {
+    if (index === 0) return
+    setFormData((prev) => {
+      const arr = [...prev.images]
+      const [item] = arr.splice(index, 1)
+      arr.unshift(item)
+      return { ...prev, images: arr }
+    })
+  }
+
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const draggedIndexRef = useRef<number | null>(null)
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (e.dataTransfer) {
+      const img = document.createElement('img')
+      img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+      e.dataTransfer.setDragImage(img, 0, 0)
+    }
+    setDraggedIndex(index)
+    draggedIndexRef.current = index
+  }
+
+  const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault()
+    const from = draggedIndexRef.current
+    if (from === null || from === targetIndex) return
+    setFormData((prev) => {
+      const arr = [...prev.images]
+      const [item] = arr.splice(from, 1)
+      arr.splice(targetIndex, 0, item)
+      return { ...prev, images: arr }
+    })
+    draggedIndexRef.current = targetIndex
+    setDraggedIndex(targetIndex)
+  }
+
+  const handleDrop = () => {
+    setDraggedIndex(null)
+    draggedIndexRef.current = null
+  }
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null)
+    draggedIndexRef.current = null
   }
 
   const canProceed = () => {
@@ -200,7 +250,8 @@ export default function SellPage() {
         return
       }
 
-      router.push('/profile/me')
+      const productId = result.data?.id
+      router.push(productId ? `/product/${productId}` : '/profile/me')
     } catch (err) {
       console.error('Submit error:', err)
       const raw = err instanceof Error ? err.message : String(err)
@@ -320,11 +371,22 @@ export default function SellPage() {
                   onChange={handleImageUpload}
                 />
 
-                <div className="grid grid-cols-3 gap-3">
+                <p className="text-sm text-muted-foreground mb-3">
+                  První fotka se zobrazí jako náhled. Přetáhněte fotku na jiné místo pro změnu pořadí, nebo klikněte na hvězdičku (max. {MAX_IMAGES} fotek).
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                   {formData.images.map((imageFile, index) => (
                     <div
                       key={index}
-                      className="relative aspect-square rounded-lg overflow-hidden bg-secondary group"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDrop={handleDrop}
+                      onDragEnd={handleDragEnd}
+                      className={`relative aspect-square rounded-lg overflow-hidden bg-secondary group cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                        draggedIndex === index ? 'opacity-50 scale-95' : ''
+                      }`}
                     >
                       <Image
                         src={imageFile.preview || "/placeholder.svg"}
@@ -333,20 +395,36 @@ export default function SellPage() {
                         className="object-cover"
                       />
                       <button
+                        type="button"
                         onClick={() => removeImage(index)}
+                        onPointerDown={(e) => e.stopPropagation()}
                         className="absolute top-1 right-1 h-6 w-6 rounded-full bg-background/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label="Odebrat fotku"
                       >
                         <X className="h-4 w-4" />
                       </button>
-                      {index === 0 && (
-                        <span className="absolute bottom-1 left-1 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
-                          Úvodní
+                      {index === 0 ? (
+                        <span
+                          className="absolute bottom-1 left-1 h-7 w-7 rounded bg-background/90 flex items-center justify-center text-primary"
+                          title="Úvodní fotka"
+                        >
+                          <Star className="h-3.5 w-3.5 fill-primary" />
                         </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setAsMainImage(index)}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          title="Nastavit jako úvodní"
+                          className="absolute bottom-1 left-1 h-7 w-7 rounded bg-background/90 hover:bg-primary hover:text-primary-foreground flex items-center justify-center transition-colors"
+                        >
+                          <Star className="h-3.5 w-3.5" />
+                        </button>
                       )}
                     </div>
                   ))}
 
-                  {formData.images.length < 6 && (
+                  {formData.images.length < MAX_IMAGES && (
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}

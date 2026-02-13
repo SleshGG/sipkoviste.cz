@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { ArrowLeft, Target, CircleDot, Circle, Package, AlertCircle, Loader2, X, ImagePlus } from 'lucide-react'
+import { ArrowLeft, Target, CircleDot, Circle, Package, AlertCircle, Loader2, X, ImagePlus, Star } from 'lucide-react'
 import { brands, materials, weights, conditions } from '@/lib/data'
 import { cn } from '@/lib/utils'
 import { updateProductAction, uploadProductImagesAction } from '@/lib/supabase/actions'
@@ -58,6 +58,7 @@ export default function EditListingPage() {
   const [negotiable, setNegotiable] = useState(false)
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([])
   const [newImageFiles, setNewImageFiles] = useState<{ file: File; preview: string }[]>([])
+  const [mainNewImageIndex, setMainNewImageIndex] = useState<number | null>(null)
   const [isResizingImages, setIsResizingImages] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -114,6 +115,83 @@ export default function EditListingPage() {
       URL.revokeObjectURL(prev[index].preview)
       return next
     })
+    setMainNewImageIndex((prev) => {
+      if (prev === null) return null
+      if (prev === index) return newImageFiles.length > 1 ? 0 : null
+      if (prev > index) return prev - 1
+      return prev
+    })
+  }
+
+  const setAsMainExisting = (index: number) => {
+    if (index === 0) return
+    setMainNewImageIndex(null)
+    setExistingImageUrls((prev) => {
+      const arr = [...prev]
+      const [item] = arr.splice(index, 1)
+      arr.unshift(item)
+      return arr
+    })
+  }
+
+  const setAsMainNew = (index: number) => {
+    setMainNewImageIndex(index)
+  }
+
+  const [draggedItem, setDraggedItem] = useState<{ type: 'existing' | 'new'; index: number } | null>(null)
+  const draggedItemRef = useRef<{ type: 'existing' | 'new'; index: number } | null>(null)
+
+  const handleDragStart = (e: React.DragEvent, type: 'existing' | 'new', index: number) => {
+    if (e.dataTransfer) {
+      const img = document.createElement('img')
+      img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+      e.dataTransfer.setDragImage(img, 0, 0)
+    }
+    const item = { type, index }
+    setDraggedItem(item)
+    draggedItemRef.current = item
+  }
+
+  const handleDragOver = (e: React.DragEvent, type: 'existing' | 'new', index: number) => {
+    e.preventDefault()
+    const from = draggedItemRef.current
+    if (!from || from.type !== type || from.index === index) return
+    if (type === 'existing') {
+      setExistingImageUrls((prev) => {
+        const arr = [...prev]
+        const [item] = arr.splice(from.index, 1)
+        arr.splice(index, 0, item)
+        return arr
+      })
+      draggedItemRef.current = { type, index }
+      setDraggedItem({ type, index })
+    } else {
+      setNewImageFiles((prev) => {
+        const arr = [...prev]
+        const [item] = arr.splice(from.index, 1)
+        arr.splice(index, 0, item)
+        return arr
+      })
+      setMainNewImageIndex((prev) => {
+        if (prev === null) return null
+        if (from.index === prev) return index
+        if (from.index < prev && index >= prev) return prev - 1
+        if (from.index > prev && index <= prev) return prev + 1
+        return prev
+      })
+      draggedItemRef.current = { type, index }
+      setDraggedItem({ type, index })
+    }
+  }
+
+  const handleDrop = () => {
+    setDraggedItem(null)
+    draggedItemRef.current = null
+  }
+
+  const handleDragEnd = () => {
+    setDraggedItem(null)
+    draggedItemRef.current = null
   }
 
   const handleAddImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,18 +224,29 @@ export default function EditListingPage() {
     setIsSubmitting(true)
     setError(null)
 
-    let finalUrls = [...existingImageUrls]
+    let finalUrls: string[] = []
 
     if (newImageFiles.length > 0) {
       const formData = new FormData()
-      newImageFiles.forEach(({ file }) => formData.append('images', file))
+      const orderedNew =
+        mainNewImageIndex !== null
+          ? [newImageFiles[mainNewImageIndex], ...newImageFiles.filter((_, i) => i !== mainNewImageIndex)]
+          : newImageFiles
+      orderedNew.forEach(({ file }) => formData.append('images', file))
       const uploadResult = await uploadProductImagesAction(formData)
       if (uploadResult.error) {
         setError(uploadResult.error)
         setIsSubmitting(false)
         return
       }
-      finalUrls = [...existingImageUrls, ...(uploadResult.urls ?? [])]
+      const uploadedUrls = uploadResult.urls ?? []
+      if (mainNewImageIndex !== null) {
+        finalUrls = [uploadedUrls[0], ...existingImageUrls, ...uploadedUrls.slice(1)]
+      } else {
+        finalUrls = [...existingImageUrls, ...uploadedUrls]
+      }
+    } else {
+      finalUrls = [...existingImageUrls]
     }
 
     const result = await updateProductAction(product.id, {
@@ -181,7 +270,7 @@ export default function EditListingPage() {
       return
     }
 
-    router.push('/dashboard')
+    router.push(`/product/${product.id}`)
   }
 
   if (isLoading) {
@@ -235,7 +324,7 @@ export default function EditListingPage() {
             <div className="grid gap-2">
               <Label>Fotky</Label>
               <p className="text-sm text-muted-foreground mb-2">
-                První fotka je úvodní. Můžete přidat nebo odebrat (max. {MAX_IMAGES} fotek).
+                První fotka se zobrazí jako náhled. Přetáhněte fotku pro změnu pořadí, nebo klikněte na hvězdičku (max. {MAX_IMAGES} fotek).
               </p>
               {isResizingImages && (
                 <p className="text-sm text-primary font-medium mb-2 flex items-center gap-2">
@@ -251,49 +340,101 @@ export default function EditListingPage() {
                 className="hidden"
                 onChange={handleAddImages}
               />
-              <div className="grid grid-cols-3 gap-3">
-                {existingImageUrls.map((url, index) => (
-                  <div
-                    key={`existing-${index}`}
-                    className="relative aspect-square rounded-lg overflow-hidden bg-secondary group"
-                  >
-                    <Image src={url} alt="" fill className="object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeExistingImage(index)}
-                      className="absolute top-1 right-1 h-7 w-7 rounded-full bg-background/90 hover:bg-background flex items-center justify-center shadow transition-opacity opacity-0 group-hover:opacity-100"
-                      aria-label="Odebrat fotku"
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {existingImageUrls.map((url, index) => {
+                  const isMain = index === 0 && mainNewImageIndex === null
+                  const isDragging = draggedItem?.type === 'existing' && draggedItem?.index === index
+                  return (
+                    <div
+                      key={`existing-${index}`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, 'existing', index)}
+                      onDragOver={(e) => handleDragOver(e, 'existing', index)}
+                      onDrop={handleDrop}
+                      onDragEnd={handleDragEnd}
+                      className={`relative aspect-square rounded-lg overflow-hidden bg-secondary group cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                        isDragging ? 'opacity-50 scale-95' : ''
+                      }`}
                     >
-                      <X className="h-4 w-4" />
-                    </button>
-                    {index === 0 && (
-                      <span className="absolute bottom-1 left-1 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
-                        Úvodní
-                      </span>
-                    )}
-                  </div>
-                ))}
-                {newImageFiles.map((item, index) => (
-                  <div
-                    key={`new-${index}`}
-                    className="relative aspect-square rounded-lg overflow-hidden bg-secondary group"
-                  >
-                    <Image src={item.preview} alt="" fill className="object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeNewImage(index)}
-                      className="absolute top-1 right-1 h-7 w-7 rounded-full bg-background/90 hover:bg-background flex items-center justify-center shadow transition-opacity opacity-0 group-hover:opacity-100"
-                      aria-label="Odebrat fotku"
+                      <Image src={url} alt="" fill className="object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeExistingImage(index)}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="absolute top-1 right-1 h-7 w-7 rounded-full bg-background/90 hover:bg-background flex items-center justify-center shadow transition-opacity opacity-0 group-hover:opacity-100"
+                        aria-label="Odebrat fotku"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                      {isMain ? (
+                        <span
+                          className="absolute bottom-1 left-1 h-7 w-7 rounded bg-background/90 flex items-center justify-center text-primary"
+                          title="Úvodní fotka"
+                        >
+                          <Star className="h-3.5 w-3.5 fill-primary" />
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setAsMainExisting(index)}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          title="Nastavit jako úvodní"
+                          className="absolute bottom-1 left-1 h-7 w-7 rounded bg-background/90 hover:bg-primary hover:text-primary-foreground flex items-center justify-center transition-colors"
+                        >
+                          <Star className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+                {newImageFiles.map((item, index) => {
+                  const isMain =
+                    mainNewImageIndex === index ||
+                    (mainNewImageIndex === null && existingImageUrls.length === 0 && index === 0)
+                  const isDragging = draggedItem?.type === 'new' && draggedItem?.index === index
+                  return (
+                    <div
+                      key={`new-${index}`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, 'new', index)}
+                      onDragOver={(e) => handleDragOver(e, 'new', index)}
+                      onDrop={handleDrop}
+                      onDragEnd={handleDragEnd}
+                      className={`relative aspect-square rounded-lg overflow-hidden bg-secondary group cursor-grab active:cursor-grabbing transition-all duration-200 ${
+                        isDragging ? 'opacity-50 scale-95' : ''
+                      }`}
                     >
-                      <X className="h-4 w-4" />
-                    </button>
-                    {existingImageUrls.length === 0 && index === 0 && (
-                      <span className="absolute bottom-1 left-1 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded">
-                        Úvodní
-                      </span>
-                    )}
-                  </div>
-                ))}
+                      <Image src={item.preview} alt="" fill className="object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeNewImage(index)}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="absolute top-1 right-1 h-7 w-7 rounded-full bg-background/90 hover:bg-background flex items-center justify-center shadow transition-opacity opacity-0 group-hover:opacity-100"
+                        aria-label="Odebrat fotku"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                      {isMain ? (
+                        <span
+                          className="absolute bottom-1 left-1 h-7 w-7 rounded bg-background/90 flex items-center justify-center text-primary"
+                          title="Úvodní fotka"
+                        >
+                          <Star className="h-3.5 w-3.5 fill-primary" />
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setAsMainNew(index)}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          title="Nastavit jako úvodní"
+                          className="absolute bottom-1 left-1 h-7 w-7 rounded bg-background/90 hover:bg-primary hover:text-primary-foreground flex items-center justify-center transition-colors"
+                        >
+                          <Star className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
                 {totalImageCount < MAX_IMAGES && (
                   <button
                     type="button"
