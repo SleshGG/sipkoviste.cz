@@ -292,7 +292,16 @@ function MessagesContent() {
           : newMsg.sender_id === otherUserId
         const isGeneralMsg = newMsg.product_id === null
         if (inConversation && (isGeneral ? isGeneralMsg : newMsg.product_id === productId)) {
-          setMessages(prev => [...prev, newMsg])
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev
+            return [...prev, newMsg]
+          })
+          const convKey = `${newMsg.sender_id === currentUserId ? newMsg.receiver_id : newMsg.sender_id}::${newMsg.product_id ?? 'general'}`
+          setConversations(prev => prev.map(c =>
+            c.id === convKey
+              ? { ...c, lastMessage: newMsg.text, timestamp: newMsg.created_at, unread: newMsg.receiver_id === currentUserId }
+              : c
+          ))
         }
       })
       .subscribe()
@@ -383,8 +392,14 @@ function MessagesContent() {
 
     setIsSending(false)
 
-    if (!result.error) {
+    if (!result.error && result.data) {
       setNewMessage('')
+      setMessages(prev => [...prev, result.data as Message])
+      setConversations(prev => prev.map(c => 
+        c.id === selectedConversation 
+          ? { ...c, lastMessage: (result.data as Message).text, timestamp: (result.data as Message).created_at }
+          : c
+      ))
     }
   }
 
