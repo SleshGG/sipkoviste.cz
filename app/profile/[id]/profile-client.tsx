@@ -343,7 +343,7 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
                   {products.map((product) =>
                     isOwnProfile ? (
                       <Card key={product.id} className="border-border bg-card overflow-hidden flex flex-col p-0">
-                        <div className="relative aspect-[4/3] bg-secondary">
+                        <div className="relative aspect-[3/4] bg-secondary">
                           <Image
                             src={product.image || '/placeholder.svg'}
                             alt={product.name}
@@ -429,7 +429,7 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
                     {soldItems.map((item) => (
                       <Card key={item.id} className="border-border bg-card overflow-hidden flex flex-col p-0">
                         {/* Fotka s tlačítky Upravit a Smazat */}
-                        <div className="relative aspect-[4/3] bg-secondary">
+                        <div className="relative aspect-[3/4] bg-secondary">
                           <Image
                             src={item.product?.image || '/placeholder.svg'}
                             alt={item.product?.name || ''}
@@ -509,7 +509,7 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                     {purchasedItems.map((item) => (
                       <Card key={item.id} className="border-border bg-card overflow-hidden flex flex-col p-0">
-                        <div className="relative aspect-[4/3] bg-secondary">
+                        <div className="relative aspect-[3/4] bg-secondary">
                           <Image
                             src={item.product?.image || '/placeholder.svg'}
                             alt={item.product?.name || ''}

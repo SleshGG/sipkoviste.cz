@@ -5,9 +5,7 @@ import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { AvatarWithOnline } from '@/components/avatar-with-online'
-import { isUserOnline } from '@/lib/utils'
-import { Star, Weight, Heart, Loader2, Eye } from 'lucide-react'
+import { Weight, Heart, Loader2, Eye } from 'lucide-react'
 import type { ProductWithSeller } from '@/lib/supabase/types'
 import type { Product as MockProduct } from '@/lib/data'
 import { motion } from 'framer-motion'
@@ -41,7 +39,7 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
             ? 'opacity-75 hover:opacity-90'
             : 'hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5'
         }`}>
-          <div className="relative aspect-[4/3] overflow-hidden bg-secondary">
+          <div className="relative aspect-[3/4] overflow-hidden bg-secondary">
             <Image
               src={product.image || "/placeholder.svg"}
               alt={product.name}
@@ -75,7 +73,7 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
               )}
             </div>
             {showFavorite && onToggleFavorite && !('sold_at' in product && product.sold_at) && (
-              <div className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 flex items-center gap-0.5 rounded-full bg-background/80 pl-2.5 pr-3 py-1 ${favoriteCount <= 0 ? 'justify-center pr-2.5' : ''}`}>
+              <div className={`absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 flex items-center gap-0.5 rounded-full bg-background/80 pl-2.5 pr-3 py-1 ${favoriteCount <= 0 ? 'justify-center pr-2.5' : ''}`}>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -122,40 +120,6 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
               <span className="text-sm sm:text-lg font-bold text-primary">
                 {product.price.toLocaleString('cs-CZ')} Kč
               </span>
-              {'seller' in product && product.seller && (
-                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
-                  <div className="overflow-visible">
-                    <AvatarWithOnline
-                      src={('avatar_url' in product.seller ? product.seller.avatar_url : product.seller.avatar) || '/placeholder.svg'}
-                      alt={product.seller.name ?? ''}
-                      size="xs"
-                      isOnline={'show_online_status' in product.seller && 'last_seen_at' in product.seller && isUserOnline(product.seller.show_online_status, product.seller.last_seen_at)}
-                    />
-                  </div>
-                  <div className="flex flex-col items-start min-w-0">
-                    <span className="truncate w-full text-left text-[10px] sm:text-xs font-medium text-foreground">
-                      {product.seller.name ?? 'Prodejce'}
-                    </span>
-                    <div className="flex items-center gap-0.5 text-[10px] sm:text-xs text-muted-foreground">
-                      {('review_count' in product.seller ? product.seller.review_count : product.seller.reviewCount ?? 0) === 0 ? (
-                        <>
-                          <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground shrink-0" />
-                          <span>0</span>
-                          <span className="hidden xs:inline">Zatím nebyl ohodnocen</span>
-                        </>
-                      ) : (
-                        <>
-                          <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-primary text-primary shrink-0" />
-                          <span>{Number(product.seller.rating ?? 0).toFixed(1)}</span>
-                          <span className="hidden xs:inline">
-                            ({'review_count' in product.seller ? product.seller.review_count : product.seller.reviewCount})
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </Card>
