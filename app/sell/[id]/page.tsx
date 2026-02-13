@@ -142,8 +142,8 @@ export default function EditListingPage() {
   const draggedItemRef = useRef<{ type: 'existing' | 'new'; index: number } | null>(null)
 
   const handleDragStart = (e: React.DragEvent, type: 'existing' | 'new', index: number) => {
-    if (e.dataTransfer) {
-      const img = document.createElement('img')
+    if (e.dataTransfer && typeof window !== 'undefined') {
+      const img = new window.Image()
       img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
       e.dataTransfer.setDragImage(img, 0, 0)
     }

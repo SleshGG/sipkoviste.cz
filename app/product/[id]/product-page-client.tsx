@@ -218,7 +218,8 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
                         fill
                         className="object-cover"
                         priority
-                        sizes="100vw"
+                        loading="eager"
+                        sizes="(max-width: 768px) 90vw, 420px"
                       />
                     </motion.div>
                   </AnimatePresence>
@@ -269,8 +270,9 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
                         alt={product.name}
                         fill
                         className="object-cover"
-                        sizes="(max-width: 768px) 100vw, 420px"
                         priority
+                        loading="eager"
+                        sizes="(max-width: 768px) 90vw, 420px"
                       />
                     </button>
                   </div>
@@ -291,8 +293,9 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
                         alt={product.name}
                         fill
                         className="object-cover"
-                        sizes="(max-width: 768px) 100vw, 66vw"
                         priority
+                        loading="eager"
+                        sizes="(max-width: 768px) 100vw, 66vw"
                       />
                     </button>
                     {/* Vpravo: dvě čtverce pod sebou */}
@@ -629,6 +632,7 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
       {/* Image Lightbox – jen fotka, max šířka, menu viditelné, zavření ve fotce */}
       <Dialog open={isImageLightboxOpen} onOpenChange={setIsImageLightboxOpen}>
         <DialogContent
+          aria-describedby={undefined}
           className="fixed z-40 p-0 border-0 bg-transparent shadow-none overflow-hidden focus:outline-none focus-visible:outline-none focus-visible:ring-0
             !top-16 !bottom-0 !left-0 !right-0 !w-full !max-w-none !translate-x-0 !translate-y-0
             !flex !items-center !justify-center
@@ -681,7 +685,7 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
 
       {/* Safety Tips Dialog */}
       <Dialog open={isSafetyDialogOpen} onOpenChange={setIsSafetyDialogOpen}>
-        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
+        <DialogContent aria-describedby={undefined} className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
               <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
