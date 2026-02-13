@@ -402,31 +402,33 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
                   {product.condition}
                 </Badge>
                 <div className="flex items-center gap-1 sm:gap-2">
-                  {(currentUserId || favoriteCount > 0) && (
-                    <div className={`flex items-center gap-0.5 rounded-full border border-border bg-background/80 pl-2.5 pr-3 py-1 sm:pl-2.5 sm:pr-3 sm:py-1.5 ${favoriteCount <= 0 || !currentUserId ? 'justify-center pr-2.5 sm:pr-2.5' : ''}`}>
-                      {currentUserId && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleToggleFavorite}
-                          disabled={isTogglingFavorite}
-                          className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-transparent group/heart"
-                          title={isFavorited ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
-                        >
-                          {isTogglingFavorite ? (
-                            <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                          ) : (
-                            <Heart className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors ${isFavorited ? 'fill-red-500 text-red-500' : 'group-hover/heart:fill-red-500 group-hover/heart:text-red-500'}`} />
-                          )}
-                        </Button>
-                      )}
-                      {favoriteCount > 0 && (
-                        <span className="text-xs sm:text-sm text-muted-foreground tabular-nums" title="Počet lidí s tímto produktem v oblíbených">
-                          {favoriteCount}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  <div className={`flex items-center gap-0.5 rounded-full border border-border bg-background/80 pl-2.5 pr-3 py-1 sm:pl-2.5 sm:pr-3 sm:py-1.5 ${favoriteCount <= 0 && !currentUserId ? 'justify-center pr-2.5 sm:pr-2.5' : ''}`}>
+                    {currentUserId ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleToggleFavorite}
+                        disabled={isTogglingFavorite}
+                        className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-transparent group/heart"
+                        title={isFavorited ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
+                      >
+                        {isTogglingFavorite ? (
+                          <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                        ) : (
+                          <Heart className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors ${isFavorited ? 'fill-red-500 text-red-500' : 'group-hover/heart:fill-red-500 group-hover/heart:text-red-500'}`} />
+                        )}
+                      </Button>
+                    ) : (
+                      <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center" title="Přihlaste se pro přidání do oblíbených">
+                        <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                      </span>
+                    )}
+                    {favoriteCount > 0 && (
+                      <span className="text-xs sm:text-sm text-muted-foreground tabular-nums" title="Počet lidí s tímto produktem v oblíbených">
+                        {favoriteCount}
+                      </span>
+                    )}
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"
