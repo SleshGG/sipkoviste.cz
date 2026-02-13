@@ -273,7 +273,7 @@ export function MarketplaceFilters({ filters, onFiltersChange, isSidebar = false
         <div className="flex-1 overflow-y-auto px-6 mt-4">
           <FilterContent filters={filters} onFiltersChange={onFiltersChange} />
         </div>
-        <div className="shrink-0 p-4 pt-4 border-t border-border bg-background">
+        <div className="shrink-0 p-4 pt-4 pb-20 md:pb-4 border-t border-border bg-background">
           <Button className="w-full" onClick={() => setOpen(false)}>
             Použít filtry
           </Button>
