@@ -266,14 +266,14 @@ export function MarketplaceFilters({ filters, onFiltersChange, isSidebar = false
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-80 overflow-y-auto">
-        <SheetHeader>
+      <SheetContent side="left" className="w-80 flex flex-col p-0">
+        <SheetHeader className="px-6 pt-6 shrink-0">
           <SheetTitle>Filtry</SheetTitle>
         </SheetHeader>
-        <div className="mt-6">
+        <div className="flex-1 overflow-y-auto px-6 mt-4">
           <FilterContent filters={filters} onFiltersChange={onFiltersChange} />
         </div>
-        <div className="mt-6">
+        <div className="shrink-0 p-4 pt-4 border-t border-border bg-background">
           <Button className="w-full" onClick={() => setOpen(false)}>
             Použít filtry
           </Button>
