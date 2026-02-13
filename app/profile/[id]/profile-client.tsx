@@ -311,28 +311,28 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
           transition={{ duration: 0.3, delay: 0.05 }}
         >
           <Tabs defaultValue="nabidky" className="w-full">
-            <TabsList className={`mb-4 grid w-full max-w-2xl ${isOwnProfile ? 'grid-cols-3' : 'grid-cols-2'} gap-2 px-4 py-2 min-h-0 overflow-visible h-auto bg-muted/50 rounded-xl border border-border`}>
+            <TabsList className={`mb-4 grid w-full max-w-2xl ${isOwnProfile ? 'grid-cols-3' : 'grid-cols-2'} gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 min-h-0 overflow-visible h-auto bg-muted/50 rounded-xl border border-border`}>
               <TabsTrigger
                 value="nabidky"
-                className="gap-2 shrink-0 px-4 sm:px-6 py-2 text-xs sm:text-sm min-h-[36px] rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-primary transition-all truncate min-w-0"
+                className="gap-1 sm:gap-2 shrink-0 px-2 sm:px-6 py-1.5 sm:py-2 text-[10px] sm:text-sm min-h-[32px] sm:min-h-[36px] rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-primary transition-all truncate min-w-0"
               >
-                <Package className="h-4 w-4 shrink-0" />
+                <Package className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                 {isOwnProfile ? 'Moje inzeráty' : 'Inzeráty'} ({products.length + soldItems.length})
               </TabsTrigger>
               {isOwnProfile && (
                 <TabsTrigger
                   value="zakoupeno"
-                  className="gap-2 shrink-0 px-4 sm:px-6 py-2 text-xs sm:text-sm min-h-[36px] rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-primary transition-all truncate min-w-0"
+                  className="gap-1 sm:gap-2 shrink-0 px-2 sm:px-6 py-1.5 sm:py-2 text-[10px] sm:text-sm min-h-[32px] sm:min-h-[36px] rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-primary transition-all truncate min-w-0"
                 >
-                  <ShoppingCart className="h-4 w-4 shrink-0" />
+                  <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                   Zakoupené ({purchasedItems.length})
                 </TabsTrigger>
               )}
               <TabsTrigger
                 value="hodnoceni"
-                className="gap-2 shrink-0 px-4 sm:px-6 py-2 text-xs sm:text-sm min-h-[36px] rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-primary transition-all truncate min-w-0"
+                className="gap-1 sm:gap-2 shrink-0 px-2 sm:px-6 py-1.5 sm:py-2 text-[10px] sm:text-sm min-h-[32px] sm:min-h-[36px] rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-primary transition-all truncate min-w-0"
               >
-                <Star className="h-4 w-4 shrink-0" />
+                <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                 Hodnocení ({reviews.length})
               </TabsTrigger>
             </TabsList>

@@ -669,7 +669,7 @@ function MessagesContent() {
                               handleSendMessage()
                             }
                           }}
-                          className="flex-1 bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-primary text-sm"
+                          className="flex-1 bg-secondary border-0 focus-visible:ring-1 focus-visible:ring-primary text-base sm:text-sm"
                         />
                         <Button 
                           size="icon" 
