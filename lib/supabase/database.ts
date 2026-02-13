@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { createClient } from './server'
 import type { Product, ProductWithSeller, Profile, Message, MessageWithRelations, Review, ProductInsert, MessageInsert, ConfirmedSale } from './types'
 
@@ -144,6 +145,32 @@ export async function getProductFavoriteCounts(productIds: string[]): Promise<Re
   return result
 }
 
+/** Počty inzerátů po kategoriích + celkový počet. Rychlejší než načítání všech produktů. */
+export async function getCategoryCounts(): Promise<{ category: string; count: number }[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('get_category_counts')
+  if (error) {
+    console.error('Error fetching category counts:', error)
+    return []
+  }
+  return (data ?? []).map((r: { category: string; count: number }) => ({
+    category: r.category,
+    count: Number(r.count) || 0,
+  }))
+}
+
+/** Celkový počet viditelných neprodaných produktů. */
+export async function getTotalProductCount(): Promise<number> {
+  const supabase = await createClient()
+  const { count, error } = await supabase
+    .from('products')
+    .select('*', { count: 'exact', head: true })
+    .eq('visible', true)
+    .is('sold_at', null)
+  if (error) return 0
+  return count ?? 0
+}
+
 /** Pro sitemap: vrací ID viditelných, neprodaných produktů. */
 export async function getProductIdsForSitemap(): Promise<string[]> {
   const supabase = await createClient()
@@ -156,9 +183,9 @@ export async function getProductIdsForSitemap(): Promise<string[]> {
   return (data ?? []).map((r) => r.id)
 }
 
-export async function getProductById(id: string): Promise<ProductWithSeller | null> {
+/** Cachovaná verze – deduplikuje volání v rámci jednoho requestu (metadata + page). */
+export const getProductByIdCached = cache(async (id: string): Promise<ProductWithSeller | null> => {
   const supabase = await createClient()
-  
   const { data, error } = await supabase
     .from('products')
     .select(`
@@ -182,8 +209,11 @@ export async function getProductById(id: string): Promise<ProductWithSeller | nu
     console.error('Error fetching product:', error)
     return null
   }
-
   return data as ProductWithSeller
+})
+
+export async function getProductById(id: string): Promise<ProductWithSeller | null> {
+  return getProductByIdCached(id)
 }
 
 export async function getProductsBySeller(sellerId: string): Promise<Product[]> {
@@ -527,6 +557,7 @@ export async function getSoldProductsWithBuyer(sellerId: string): Promise<Array<
   id: string
   product_id: string
   confirmed_at: string
+  sale_price: number | null
   product: { id: string; name: string; brand: string; price: number; condition: string; image: string | null; sold_at: string | null; view_count?: number }
   buyer: { id: string; name: string | null; avatar_url: string | null }
 }>> {
@@ -537,6 +568,7 @@ export async function getSoldProductsWithBuyer(sellerId: string): Promise<Array<
       id,
       product_id,
       confirmed_at,
+      sale_price,
       product:products!confirmed_sales_product_id_fkey(id, name, brand, price, condition, image, sold_at, view_count),
       buyer:profiles!confirmed_sales_buyer_id_fkey(id, name, avatar_url)
     `)
@@ -552,6 +584,7 @@ export async function getSoldProductsWithBuyer(sellerId: string): Promise<Array<
     id: string
     product_id: string
     confirmed_at: string
+    sale_price: number | null
     product: { id: string; name: string; brand: string; price: number; condition: string; image: string | null; sold_at: string | null; view_count?: number }
     buyer: { id: string; name: string | null; avatar_url: string | null }
   }>
@@ -562,6 +595,7 @@ export async function getPurchasedItemsForUser(buyerId: string): Promise<Array<{
   id: string
   product_id: string
   confirmed_at: string
+  sale_price: number | null
   product: { id: string; name: string; brand: string; price: number; condition: string; image: string | null }
   seller: { id: string; name: string | null; avatar_url: string | null }
 }>> {
@@ -572,6 +606,7 @@ export async function getPurchasedItemsForUser(buyerId: string): Promise<Array<{
       id,
       product_id,
       confirmed_at,
+      sale_price,
       product:products!confirmed_sales_product_id_fkey(id, name, brand, price, condition, image),
       seller:profiles!confirmed_sales_seller_id_fkey(id, name, avatar_url)
     `)
@@ -587,6 +622,7 @@ export async function getPurchasedItemsForUser(buyerId: string): Promise<Array<{
     id: string
     product_id: string
     confirmed_at: string
+    sale_price: number | null
     product: { id: string; name: string; brand: string; price: number; condition: string; image: string | null }
     seller: { id: string; name: string | null; avatar_url: string | null }
   }>

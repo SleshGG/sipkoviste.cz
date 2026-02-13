@@ -1,7 +1,7 @@
 import dynamic from 'next/dynamic'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { getProductFavoriteCounts, getTopProductsByFavorites, getProductsByIds } from '@/lib/supabase/database'
+import { getProductFavoriteCounts, getTopProductsByFavorites, getProductsByIds, getCategoryCounts, getTotalProductCount } from '@/lib/supabase/database'
 import type { ProductWithSeller } from '@/lib/supabase/types'
 import { defaultOgImage, defaultOgImageUrl } from '@/lib/site-config'
 
@@ -43,9 +43,13 @@ const categoryNames: Record<string, string> = {
 export default async function HomePage() {
   const supabase = await createClient()
 
-  // Doporučené = 5 produktů (2/3/4/5 dle viewportu), primárně s nejvíce srdíčky, doplněno nejnovějšími
+  // Načíst doporučené produkty a počty kategorií paralelně
   const TARGET_COUNT = 5
-  const topByFavorites = await getTopProductsByFavorites(TARGET_COUNT)
+  const [topByFavorites, categoryCountsRaw, totalProducts] = await Promise.all([
+    getTopProductsByFavorites(TARGET_COUNT),
+    getCategoryCounts(),
+    getTotalProductCount(),
+  ])
   let featuredProducts: ProductWithSeller[] = []
   const favoriteCounts: Record<string, number> = {}
 
@@ -145,31 +149,14 @@ export default async function HomePage() {
     }
   }
 
-  // Fetch category counts – jen viditelné
-  const { data: allProducts } = await supabase
-    .from('products')
-    .select('category')
-    .eq('visible', true)
-    .is('sold_at', null)
-
-  // Calculate category counts
+  // Mapovat počty z DB na pevné pořadí kategorií
+  const countMap = Object.fromEntries(categoryCountsRaw.map((c) => [c.category, c.count]))
   const categoryCounts = [
-    { id: 'steel-darts', name: categoryNames['steel-darts'], count: 0 },
-    { id: 'soft-darts', name: categoryNames['soft-darts'], count: 0 },
-    { id: 'dartboards', name: categoryNames['dartboards'], count: 0 },
-    { id: 'accessories', name: categoryNames['accessories'], count: 0 },
+    { id: 'steel-darts', name: categoryNames['steel-darts'], count: countMap['steel-darts'] ?? 0 },
+    { id: 'soft-darts', name: categoryNames['soft-darts'], count: countMap['soft-darts'] ?? 0 },
+    { id: 'dartboards', name: categoryNames['dartboards'], count: countMap['dartboards'] ?? 0 },
+    { id: 'accessories', name: categoryNames['accessories'], count: countMap['accessories'] ?? 0 },
   ]
-
-  if (allProducts) {
-    allProducts.forEach((product) => {
-      const category = categoryCounts.find((c) => c.id === product.category)
-      if (category) {
-        category.count++
-      }
-    })
-  }
-
-  const totalProducts = allProducts?.length || 0
 
   return (
     <HomeClient

@@ -77,7 +77,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const product = await getProduct(id)
+  const [product, favoriteCounts] = await Promise.all([
+    getProduct(id),
+    getProductFavoriteCounts([id]),
+  ])
 
   if (!product) {
     return (
@@ -93,10 +96,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     )
   }
 
-  const favoriteCounts = await getProductFavoriteCounts([id])
   const favoriteCount = favoriteCounts[id] ?? 0
 
-  await incrementProductViewAction(id)
+  incrementProductViewAction(id)
 
   return <ProductPageClient product={product} favoriteCount={favoriteCount} />
 }

@@ -44,6 +44,7 @@ type PurchasedItem = {
   id: string
   product_id: string
   confirmed_at: string
+  sale_price: number | null
   product: { id: string; name: string; brand: string; price: number; condition: string; image: string | null }
   seller: { id: string; name: string | null; avatar_url: string | null }
 }
@@ -52,6 +53,7 @@ type SoldItem = {
   id: string
   product_id: string
   confirmed_at: string
+  sale_price: number | null
   product: { id: string; name: string; brand: string; price: number; condition: string; image: string | null; sold_at: string | null; view_count?: number }
   buyer: { id: string; name: string | null; avatar_url: string | null }
 }
@@ -338,7 +340,7 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
             </TabsList>
 
             <TabsContent value="nabidky" className="mt-0">
-              {products.length > 0 ? (
+              {products.length > 0 || soldItems.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                   {products.map((product) =>
                     isOwnProfile ? (
@@ -400,6 +402,83 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
                       />
                     )
                   )}
+                  {soldItems.map((item) => (
+                    <Card key={item.id} className="border-border bg-card overflow-hidden flex flex-col p-0">
+                      <div className="relative aspect-[3/4] bg-secondary">
+                        <Image
+                          src={item.product?.image || '/placeholder.svg'}
+                          alt={item.product?.name || ''}
+                          fill
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                          className="object-cover grayscale"
+                        />
+                        <div className="absolute top-1.5 left-1.5 flex h-7 min-w-[28px] items-center justify-center gap-1 rounded bg-white dark:bg-white/90 px-2 text-[10px] sm:text-xs z-10" style={{ color: '#2b2e33' }}>
+                          <Eye className="h-3 w-3 shrink-0" />
+                          <span className="tabular-nums">{item.product?.view_count ?? 0}</span>
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Badge className="text-sm px-3 py-1 shrink-0 bg-green-200 dark:bg-green-800/50 text-green-900 dark:text-green-100 border-transparent shadow-md">
+                            Prodané
+                          </Badge>
+                        </div>
+                        <div className="absolute top-1.5 right-1.5 flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 bg-white dark:bg-white/90 text-primary border-0 cursor-pointer" asChild>
+                            <Link href={`/sell/${item.product_id}`} title="Upravit">
+                              <Edit className="h-3 w-3" />
+                            </Link>
+                          </Button>
+                          {productIdsCanDelete.includes(item.product_id) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 bg-white dark:bg-white/90 text-destructive border-0 cursor-pointer"
+                              title="Smazat"
+                              onClick={() => {
+                                setProductToDelete(item.product_id)
+                                setDeleteDialogOpen(true)
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="p-3 flex flex-col flex-1">
+                        <h3 className="font-semibold text-sm truncate">{item.product?.name}</h3>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{item.product?.brand} · {item.product?.condition}</p>
+                        {item.buyer && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Kupující: {item.buyer.name || 'Uživatel'}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Prodané {item.confirmed_at ? new Date(item.confirmed_at).toLocaleDateString('cs-CZ') : ''}
+                        </p>
+                        <p className="text-sm font-bold text-primary mt-2">
+                          {(item.sale_price ?? item.product?.price ?? 0).toLocaleString('cs-CZ')} Kč
+                        </p>
+                        <div className="flex flex-col gap-2 mt-3">
+                          <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
+                            <Link href={`/product/${item.product_id}`}>Zobrazit inzerát</Link>
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
+                            <Link href={item.buyer ? `/messages?to=${item.buyer.id}&product=${item.product_id}` : '/messages'}>Zprávy</Link>
+                          </Button>
+                          {!reviewedBuyerIds[item.product_id] ? (
+                            <Button variant="outline" size="sm" className="gap-1 h-8 text-xs bg-primary/10 text-primary border-primary/20" onClick={() => openReviewBuyerDialog(item)}>
+                              <Star className="h-3 w-3" />
+                              Ohodnotit kupujícího
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1 py-2">
+                              <Star className="h-3 w-3 fill-primary text-primary" />
+                              Kupující ohodnocen
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               ) : !isOwnProfile ? (
                 <Card className="p-8 text-center border-dashed">
@@ -421,85 +500,6 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
                     <Button className="mt-4 gap-2">Přidat inzerát</Button>
                   </Link>
                 </Card>
-              )}
-              {isOwnProfile && soldItems.length > 0 && (
-                <div className="mt-8 w-full">
-                  <h3 className="text-lg font-semibold mb-4">Prodané inzeráty</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                    {soldItems.map((item) => (
-                      <Card key={item.id} className="border-border bg-card overflow-hidden flex flex-col p-0">
-                        {/* Fotka s tlačítky Upravit a Smazat */}
-                        <div className="relative aspect-[3/4] bg-secondary">
-                          <Image
-                            src={item.product?.image || '/placeholder.svg'}
-                            alt={item.product?.name || ''}
-                            fill
-                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                            className="object-cover grayscale"
-                          />
-                          <div className="absolute top-1.5 left-1.5 flex h-7 min-w-[28px] items-center justify-center gap-1 rounded bg-white dark:bg-white/90 px-2 text-[10px] sm:text-xs z-10" style={{ color: '#2b2e33' }}>
-                            <Eye className="h-3 w-3 shrink-0" />
-                            <span className="tabular-nums">{item.product?.view_count ?? 0}</span>
-                          </div>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Badge className="text-sm px-3 py-1 shrink-0 bg-green-200 dark:bg-green-800/50 text-green-900 dark:text-green-100 border-transparent shadow-md">
-                              Prodané
-                            </Badge>
-                          </div>
-                          <div className="absolute top-1.5 right-1.5 flex gap-1">
-                            <Button variant="ghost" size="icon" className="h-7 w-7 bg-white dark:bg-white/90 text-primary border-0 cursor-pointer" asChild>
-                              <Link href={`/sell/${item.product_id}`} title="Upravit">
-                                <Edit className="h-3 w-3" />
-                              </Link>
-                            </Button>
-                            {productIdsCanDelete.includes(item.product_id) && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 bg-white dark:bg-white/90 text-destructive border-0 cursor-pointer"
-                                title="Smazat"
-                                onClick={() => {
-                                  setProductToDelete(item.product_id)
-                                  setDeleteDialogOpen(true)
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {/* Informace pod sebou */}
-                        <div className="p-3 flex flex-col flex-1">
-                          <h3 className="font-semibold text-sm truncate">{item.product?.name}</h3>
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">{item.product?.brand} · {item.product?.condition}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Prodané {item.confirmed_at ? new Date(item.confirmed_at).toLocaleDateString('cs-CZ') : ''}
-                          </p>
-                          <p className="text-sm font-bold text-primary mt-2">
-                            {item.product?.price?.toLocaleString('cs-CZ')} Kč
-                          </p>
-                          {/* Tlačítka */}
-                          <div className="flex flex-col gap-2 mt-3">
-                            <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
-                              <Link href={`/product/${item.product_id}`}>Zobrazit inzerát</Link>
-                            </Button>
-                            {!reviewedBuyerIds[item.product_id] ? (
-                              <Button variant="outline" size="sm" className="gap-1 h-8 text-xs bg-primary/10 text-primary border-primary/20" onClick={() => openReviewBuyerDialog(item)}>
-                                <Star className="h-3 w-3" />
-                                Ohodnotit kupujícího
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1 py-2">
-                                <Star className="h-3 w-3 fill-primary text-primary" />
-                                Kupující ohodnocen
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
               )}
             </TabsContent>
 
@@ -528,7 +528,7 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
                             Zakoupeno {item.confirmed_at ? new Date(item.confirmed_at).toLocaleDateString('cs-CZ') : ''}
                           </p>
                           <p className="text-sm font-bold text-primary mt-2">
-                            {item.product?.price?.toLocaleString('cs-CZ')} Kč
+                            {(item.sale_price ?? item.product?.price ?? 0).toLocaleString('cs-CZ')} Kč
                           </p>
                           <div className="flex flex-col gap-2 mt-3">
                             <Button variant="outline" size="sm" className="h-8 text-xs" asChild>

@@ -42,10 +42,10 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
   if (!profile) return notFound()
 
   const allProductIds = [...products.map((p) => p.id), ...soldItems.map((s) => s.product.id)]
-  const favoriteCounts = allProductIds.length > 0 ? await getProductFavoriteCounts(allProductIds) : {}
-  const productIdsCanDelete = isOwnProfile && allProductIds.length > 0
-    ? await getProductIdsCanDelete(allProductIds)
-    : new Set<string>()
+  const [favoriteCounts, productIdsCanDelete] = await Promise.all([
+    allProductIds.length > 0 ? getProductFavoriteCounts(allProductIds) : Promise.resolve({}),
+    isOwnProfile && allProductIds.length > 0 ? getProductIdsCanDelete(allProductIds) : Promise.resolve(new Set<string>()),
+  ])
 
   return (
     <ProfileClient

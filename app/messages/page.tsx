@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase/client'
-import { sendMessageAction, markMessagesAsReadAction, confirmSaleAction, getSaleStatusAction, submitReviewAction } from '@/lib/supabase/actions'
+import { sendMessageAction, markMessagesAsReadAction, getSaleStatusAction, submitReviewAction, acceptOfferAction, rejectOfferAction, sendCounterOfferAction } from '@/lib/supabase/actions'
 import { AvatarWithOnline } from '@/components/avatar-with-online'
 import { isUserOnline } from '@/lib/utils'
 import type { MessageWithRelations } from '@/lib/supabase/types'
@@ -70,6 +70,9 @@ interface Message {
   product_id: string | null
   text: string
   is_read: boolean
+  message_type?: 'question' | 'buy' | 'offer' | null
+  offer_amount?: number | null
+  offer_status?: 'pending' | 'accepted' | 'rejected' | null
   created_at: string
 }
 
@@ -91,6 +94,7 @@ function formatTimestamp(date: string) {
 function MessagesContent() {
   const searchParams = useSearchParams()
   const toUserId = searchParams.get('to')
+  const productIdFromUrl = searchParams.get('product')
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -101,11 +105,14 @@ function MessagesContent() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [saleStatus, setSaleStatus] = useState<{ confirmed: boolean; canReview: boolean; alreadyReviewed: boolean; productSoldToOther?: boolean } | null>(null)
-  const [isConfirmingSale, setIsConfirmingSale] = useState(false)
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
   const [reviewRating, setReviewRating] = useState(0)
   const [reviewComment, setReviewComment] = useState('')
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+  const [processingOfferId, setProcessingOfferId] = useState<string | null>(null)
+  const [counterOfferDialogOpen, setCounterOfferDialogOpen] = useState(false)
+  const [counterOfferMessageId, setCounterOfferMessageId] = useState<string | null>(null)
+  const [counterOfferAmount, setCounterOfferAmount] = useState('')
 
   // Při změně zpráv nebo konverzace posunout na konec (poslední zprávy)
   useEffect(() => {
@@ -189,8 +196,13 @@ function MessagesContent() {
       }
 
       let list = Array.from(conversationsMap.values())
+      const productConvKey = toUserId && productIdFromUrl ? `${toUserId}::${productIdFromUrl}` : null
       const generalWithTo = toUserId ? list.find((c) => c.id === `${toUserId}::general`) : null
-      if (toUserId && !generalWithTo) {
+      const productConv = productConvKey ? list.find((c) => c.id === productConvKey) : null
+
+      if (productConv) {
+        setSelectedConversation(productConv.id)
+      } else if (toUserId && !productIdFromUrl && !generalWithTo) {
         const { data: profile } = await supabase.from('profiles').select('id, name, avatar_url').eq('id', toUserId).single()
         if (profile && profile.id !== user.id) {
           const virtualConv: Conversation = {
@@ -204,7 +216,7 @@ function MessagesContent() {
           list = [virtualConv, ...list]
           setSelectedConversation(virtualConv.id)
         }
-      } else if (generalWithTo) {
+      } else if (generalWithTo && !productIdFromUrl) {
         setSelectedConversation(generalWithTo.id)
       } else if (list.length > 0 && typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
         setSelectedConversation(list[0].id)
@@ -212,7 +224,7 @@ function MessagesContent() {
       setConversations(list)
       setIsLoading(false)
     })
-  }, [toUserId])
+  }, [toUserId, productIdFromUrl])
 
   const selectedConv = conversations.find(c => c.id === selectedConversation)
 
@@ -277,7 +289,7 @@ function MessagesContent() {
 
     fetchMessages()
 
-    // Subscribe to new messages
+    // Subscribe to new messages and updates (nabídky – přijetí/odmítnutí)
     const channel = supabase
       .channel('messages')
       .on('postgres_changes', {
@@ -302,6 +314,26 @@ function MessagesContent() {
               ? { ...c, lastMessage: newMsg.text, timestamp: newMsg.created_at, unread: newMsg.receiver_id === currentUserId }
               : c
           ))
+        }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: isGeneral ? 'product_id=is.null' : `product_id=eq.${productId}`,
+      }, (payload) => {
+        const updatedMsg = payload.new as Message
+        const inConversation = updatedMsg.sender_id === currentUserId
+          ? updatedMsg.receiver_id === otherUserId
+          : updatedMsg.sender_id === otherUserId
+        const isGeneralMsg = updatedMsg.product_id === null
+        if (inConversation && (isGeneral ? isGeneralMsg : updatedMsg.product_id === productId)) {
+          setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m))
+          if (updatedMsg.offer_status === 'accepted' && updatedMsg.product_id && selectedConv?.product?.seller_id) {
+            getSaleStatusAction(updatedMsg.product_id, otherUserId, selectedConv.product.seller_id).then((res) => {
+              if (!res.error) setSaleStatus({ confirmed: res.confirmed, canReview: res.canReview, alreadyReviewed: res.alreadyReviewed, productSoldToOther: res.productSoldToOther })
+            })
+          }
         }
       })
       .subscribe()
@@ -343,20 +375,6 @@ function MessagesContent() {
     }
   }, [selectedConversation, currentUserId, conversations])
 
-  const handleConfirmSale = async () => {
-    if (!selectedConv || !currentUserId || !selectedConv.product?.seller_id) return
-    setIsConfirmingSale(true)
-    const err = await confirmSaleAction(selectedConv.product!.id, selectedConv.participant.id, selectedConv.product!.seller_id!)
-    setIsConfirmingSale(false)
-    if (err?.error) {
-      alert(err.error)
-      return
-    }
-    getSaleStatusAction(selectedConv.product!.id, selectedConv.participant.id, selectedConv.product!.seller_id!).then((res) => {
-      if (!res.error) setSaleStatus({ confirmed: res.confirmed, canReview: res.canReview, alreadyReviewed: res.alreadyReviewed, productSoldToOther: res.productSoldToOther })
-    })
-  }
-
   const handleSubmitReview = async () => {
     if (!selectedConv || !selectedConv.product || reviewRating < 1 || reviewRating > 5) return
     setIsSubmittingReview(true)
@@ -375,6 +393,55 @@ function MessagesContent() {
     setReviewRating(0)
     setReviewComment('')
     setSaleStatus((prev) => (prev ? { ...prev, canReview: false, alreadyReviewed: true } : null))
+  }
+
+  const handleAcceptOffer = async (messageId: string) => {
+    setProcessingOfferId(messageId)
+    const err = await acceptOfferAction(messageId)
+    setProcessingOfferId(null)
+    if (err?.error) alert(err.error)
+    else {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, offer_status: 'accepted' as const } : m))
+      if (selectedConv?.product?.seller_id) {
+        getSaleStatusAction(selectedConv.product.id, selectedConv.participant.id, selectedConv.product.seller_id).then((res) => {
+          if (!res.error) setSaleStatus({ confirmed: res.confirmed, canReview: res.canReview, alreadyReviewed: res.alreadyReviewed, productSoldToOther: res.productSoldToOther })
+        })
+      }
+    }
+  }
+
+  const handleRejectOffer = async (messageId: string) => {
+    setProcessingOfferId(messageId)
+    const err = await rejectOfferAction(messageId)
+    setProcessingOfferId(null)
+    if (err?.error) alert(err.error)
+    else {
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, offer_status: 'rejected' as const } : m))
+    }
+  }
+
+  const handleOpenCounterOffer = (messageId: string) => {
+    setCounterOfferMessageId(messageId)
+    setCounterOfferAmount('')
+    setCounterOfferDialogOpen(true)
+  }
+
+  const handleSubmitCounterOffer = async () => {
+    const amount = parseInt(counterOfferAmount.replace(/\s/g, ''), 10)
+    if (!counterOfferMessageId || !amount || amount < 1) {
+      alert('Zadejte platnou částku.')
+      return
+    }
+    setProcessingOfferId(counterOfferMessageId)
+    const result = await sendCounterOfferAction(counterOfferMessageId, amount)
+    setProcessingOfferId(null)
+    setCounterOfferDialogOpen(false)
+    setCounterOfferMessageId(null)
+    setCounterOfferAmount('')
+    if (result?.error) alert(result.error)
+    else if (result?.data) {
+      setMessages(prev => prev.map(m => m.id === counterOfferMessageId ? { ...m, offer_status: 'rejected' as const } : m))
+    }
   }
 
   const handleSendMessage = async () => {
@@ -605,18 +672,6 @@ function MessagesContent() {
                             Inzerát byl již prodán jinému kupujícímu
                           </span>
                         )}
-                        {!saleStatus.confirmed && !saleStatus.productSoldToOther && currentUserId === selectedConv.product.seller_id && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5"
-                            onClick={handleConfirmSale}
-                            disabled={isConfirmingSale}
-                          >
-                            {isConfirmingSale ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                            Potvrdit prodej
-                          </Button>
-                        )}
                         {saleStatus.confirmed && saleStatus.canReview && (
                           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setReviewDialogOpen(true)}>
                             <Star className="h-4 w-4" />
@@ -639,35 +694,86 @@ function MessagesContent() {
                     {/* Messages Area */}
                     <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-background/50">
                       <div className="space-y-3 sm:space-y-4 max-w-3xl mx-auto">
-                        {messages.map((msg) => (
-                          <div
-                            key={msg.id}
-                            className={`flex gap-2 sm:gap-3 ${msg.sender_id === currentUserId ? 'justify-end' : ''}`}
-                          >
-                            {msg.sender_id !== currentUserId && (
-                              <AvatarWithOnline
-                                src={selectedConv.participant.avatar_url ?? '/placeholder.svg'}
-                                alt=""
-                                size="xs"
-                                isOnline={false}
-                              />
-                            )}
-                            <div className={`space-y-1 max-w-[80%] sm:max-w-[75%] ${msg.sender_id === currentUserId ? 'items-end' : ''}`}>
-                              <div
-                                className={`rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5 ${
-                                  msg.sender_id === currentUserId
-                                    ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                                    : 'bg-secondary rounded-tl-sm'
-                                }`}
-                              >
-                                <p className="text-xs sm:text-sm">{msg.text}</p>
+                        {messages.map((msg) => {
+                          const isOffer = msg.message_type === 'offer'
+                          const isPendingOffer = isOffer && (msg.offer_status === 'pending' || msg.offer_status == null)
+                          const canRespondToOffer = isPendingOffer && msg.receiver_id === currentUserId
+                          return (
+                            <div
+                              key={msg.id}
+                              className={`flex gap-2 sm:gap-3 ${msg.sender_id === currentUserId ? 'justify-end' : ''}`}
+                            >
+                              {msg.sender_id !== currentUserId && (
+                                <AvatarWithOnline
+                                  src={selectedConv.participant.avatar_url ?? '/placeholder.svg'}
+                                  alt=""
+                                  size="xs"
+                                  isOnline={false}
+                                />
+                              )}
+                              <div className={`space-y-1 max-w-[80%] sm:max-w-[75%] ${msg.sender_id === currentUserId ? 'items-end' : ''}`}>
+                                <div
+                                  className={`rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5 ${
+                                    msg.sender_id === currentUserId
+                                      ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                                      : 'bg-secondary rounded-tl-sm'
+                                  }`}
+                                >
+                                  <p className="text-xs sm:text-sm">
+                                    {msg.text.endsWith(' Šipkobot') ? (
+                                      <>
+                                        {msg.text.slice(0, -9)}
+                                        {' '}
+                                        <strong>Šipkobot</strong>
+                                      </>
+                                    ) : (
+                                      msg.text
+                                    )}
+                                  </p>
+                                  {isOffer && msg.offer_status === 'accepted' && (
+                                    <p className="text-xs mt-1 opacity-90">✓ Nabídka přijata</p>
+                                  )}
+                                  {isOffer && msg.offer_status === 'rejected' && (
+                                    <p className="text-xs mt-1 opacity-90">Nabídka odmítnuta</p>
+                                  )}
+                                </div>
+                                {canRespondToOffer && (
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    <Button
+                                      size="sm"
+                                      className="h-8 text-xs"
+                                      onClick={() => handleAcceptOffer(msg.id)}
+                                      disabled={!!processingOfferId}
+                                    >
+                                      {processingOfferId === msg.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Přijmout'}
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 text-xs"
+                                      onClick={() => handleOpenCounterOffer(msg.id)}
+                                      disabled={!!processingOfferId}
+                                    >
+                                      Protinabídka
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 text-xs"
+                                      onClick={() => handleRejectOffer(msg.id)}
+                                      disabled={!!processingOfferId}
+                                    >
+                                      Odmítnout
+                                    </Button>
+                                  </div>
+                                )}
+                                <span className={`text-[10px] sm:text-xs text-muted-foreground ${msg.sender_id === currentUserId ? 'mr-2 text-right block' : 'ml-2'}`}>
+                                  {formatTimestamp(msg.created_at)}
+                                </span>
                               </div>
-                              <span className={`text-[10px] sm:text-xs text-muted-foreground ${msg.sender_id === currentUserId ? 'mr-2 text-right block' : 'ml-2'}`}>
-                                {formatTimestamp(msg.created_at)}
-                              </span>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                         <div ref={messagesEndRef} />
                       </div>
                     </div>
@@ -741,6 +847,41 @@ function MessagesContent() {
                           <Button onClick={handleSubmitReview} disabled={reviewRating < 1 || isSubmittingReview}>
                             {isSubmittingReview ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                             Odeslat hodnocení
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Dialog pro protinabídku */}
+                    <Dialog open={counterOfferDialogOpen} onOpenChange={(open) => { setCounterOfferDialogOpen(open); if (!open) setCounterOfferMessageId(null) }}>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Protinabídka</DialogTitle>
+                          <DialogDescription>
+                            Zadejte částku, kterou jste ochotný akceptovat.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-2">
+                          <div>
+                            <label htmlFor="counter-amount" className="text-sm font-medium block mb-1.5">Vaše nabídka (Kč)</label>
+                            <input
+                              id="counter-amount"
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="např. 1 500"
+                              value={counterOfferAmount}
+                              onChange={(e) => setCounterOfferAmount(e.target.value.replace(/[^\d\s]/g, ''))}
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setCounterOfferDialogOpen(false)}>
+                            Zrušit
+                          </Button>
+                          <Button onClick={handleSubmitCounterOffer} disabled={!counterOfferAmount.trim() || !!processingOfferId}>
+                            {processingOfferId ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Odeslat protinabídku
                           </Button>
                         </DialogFooter>
                       </DialogContent>

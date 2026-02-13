@@ -38,7 +38,7 @@ import {
 import type { Product as MockProduct } from '@/lib/data'
 import type { ProductWithSeller } from '@/lib/supabase/types'
 import { createClient } from '@/lib/supabase/client'
-import { sendMessageAction, getFavoriteProductIdsAction, toggleFavoriteAction } from '@/lib/supabase/actions'
+import { sendBuyIntentAction, sendOfferAction, sendQuestionAction, getFavoriteProductIdsAction, toggleFavoriteAction } from '@/lib/supabase/actions'
 import { AvatarWithOnline } from '@/components/avatar-with-online'
 import { isUserOnline, formatMemberSince } from '@/lib/utils'
 
@@ -66,7 +66,7 @@ interface ProductPageClientProps {
 export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageClientProps) {
   const router = useRouter()
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false)
+  const [dialogMode, setDialogMode] = useState<'buy' | 'offer' | 'question' | null>(null)
   const [isSafetyDialogOpen, setIsSafetyDialogOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [isFavorited, setIsFavorited] = useState(false)
@@ -125,32 +125,71 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
     setIsTogglingFavorite(false)
   }
 
-  const handleSendMessage = async () => {
-    const text =
-      product.negotiable && offerAmount.trim() !== ''
-        ? `Nabízím ${offerAmount.trim().replace(/\s/g, '')} Kč.\n\n${message.trim()}`
-        : message.trim()
-    if (!text) return
+  const handleBuy = async () => {
     setIsSending(true)
-    const result = await sendMessageAction({
-      receiver_id: product.seller.id,
-      product_id: product.id,
-      text,
-    })
+    const result = await sendBuyIntentAction(
+      product.id,
+      product.seller.id,
+      product.name,
+      product.seller.name ?? 'Prodejce'
+    )
     setIsSending(false)
-
     if (result.error) {
       alert(result.error)
       return
     }
+    setMessageSent(true)
+    setTimeout(() => {
+      setDialogMode(null)
+      setMessageSent(false)
+      router.push(`/messages?to=${product.seller.id}&product=${product.id}`)
+    }, 1200)
+  }
 
+  const handleOffer = async () => {
+    const amount = parseInt(offerAmount.replace(/\s/g, ''), 10)
+    if (!amount || amount < 1) {
+      alert('Zadejte platnou částku.')
+      return
+    }
+    setIsSending(true)
+    const result = await sendOfferAction(
+      product.id,
+      product.seller.id,
+      product.name,
+      product.seller.name ?? 'Prodejce',
+      amount
+    )
+    setIsSending(false)
+    if (result.error) {
+      alert(result.error)
+      return
+    }
     setMessageSent(true)
     setOfferAmount('')
     setTimeout(() => {
-      setIsMessageDialogOpen(false)
-      setMessage('')
+      setDialogMode(null)
       setMessageSent(false)
-    }, 1500)
+      router.push(`/messages?to=${product.seller.id}&product=${product.id}`)
+    }, 1200)
+  }
+
+  const handleQuestion = async () => {
+    if (!message.trim()) return
+    setIsSending(true)
+    const result = await sendQuestionAction(product.id, product.seller.id, message.trim())
+    setIsSending(false)
+    if (result.error) {
+      alert(result.error)
+      return
+    }
+    setMessageSent(true)
+    setMessage('')
+    setTimeout(() => {
+      setDialogMode(null)
+      setMessageSent(false)
+      router.push(`/messages?to=${product.seller.id}&product=${product.id}`)
+    }, 1200)
   }
 
   const images = (product.images && product.images.length > 0) ? product.images : (product.image ? [product.image] : ['/placeholder.svg'])
@@ -429,20 +468,32 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
             )}
 
             {/* Quick Actions */}
-            <div className="flex gap-2 sm:gap-3">
+            <div className={`grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 w-full ${('negotiable' in product && product.negotiable) && (!('sold_at' in product) || !product.sold_at) ? 'sm:grid-cols-4' : ''}`}>
               {(!('sold_at' in product) || !product.sold_at) && (
-                <Button className="flex-1 gap-2 text-sm sm:text-base h-10 sm:h-11" onClick={() => setIsMessageDialogOpen(true)}>
-                  <MessageCircle className="h-4 w-4" />
-                  <span className="hidden xs:inline">Napsat</span> prodejci
-                </Button>
+                <>
+                  <Button className="w-full gap-2 text-sm sm:text-base h-10 sm:h-11" onClick={() => setDialogMode('buy')}>
+                    <Check className="h-4 w-4" />
+                    Koupit
+                  </Button>
+                  {('negotiable' in product && product.negotiable) && (
+                    <Button variant="outline" className="w-full gap-2 text-sm sm:text-base h-10 sm:h-11" onClick={() => setDialogMode('offer')}>
+                      <MessageCircle className="h-4 w-4" />
+                      Nabídnout cenu
+                    </Button>
+                  )}
+                  <Button variant="outline" className="w-full gap-2 text-sm sm:text-base h-10 sm:h-11" onClick={() => setDialogMode('question')}>
+                    <MessageCircle className="h-4 w-4" />
+                    Poslat dotaz
+                  </Button>
+                </>
               )}
               <Button
                 variant="outline"
-                className="gap-2 bg-transparent text-sm sm:text-base h-10 sm:h-11"
+                className={`w-full gap-2 bg-transparent text-sm sm:text-base h-10 sm:h-11 ${('sold_at' in product && product.sold_at) ? 'sm:col-span-3' : ''}`}
                 onClick={() => setIsSafetyDialogOpen(true)}
               >
                 <Shield className="h-4 w-4" />
-                <span className="hidden sm:inline">Bezpečnostní</span> tipy
+                Bezpečnostní tipy
               </Button>
             </div>
 
@@ -543,20 +594,28 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
         </div>
       </main>
 
-      {/* Message Dialog */}
+      {/* Koupit / Nabídnout cenu / Poslat dotaz Dialog */}
       <Dialog
-        open={isMessageDialogOpen}
+        open={dialogMode !== null}
         onOpenChange={(open) => {
-          setIsMessageDialogOpen(open)
-          if (!open) setOfferAmount('')
+          if (!open) {
+            setDialogMode(null)
+            setOfferAmount('')
+            setMessage('')
+          }
         }}
       >
         <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-base sm:text-lg">Napsat prodejci</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg">
+              {dialogMode === 'buy' && 'Koupit produkt'}
+              {dialogMode === 'offer' && 'Nabídnout cenu'}
+              {dialogMode === 'question' && 'Poslat dotaz'}
+            </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
-              Odešlete zprávu prodejci {product.seller.name} ohledně tohoto zboží
-              {product.negotiable && ' — prodejce je otevřen cenovým nabídkám.'}
+              {dialogMode === 'buy' && `Prodejci ${product.seller.name} přijde e-mail. Poté si domluvíte podrobnosti v chatu.`}
+              {dialogMode === 'offer' && `Prodejci přijde e-mail s vaší nabídkou. Pokud ji přijme, dostanete upozornění.`}
+              {dialogMode === 'question' && `Prodejci ${product.seller.name} přijde zpráva do chatu (bez e-mailu).`}
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-secondary rounded-lg mb-3 sm:mb-4">
@@ -578,52 +637,76 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
               <div className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 rounded-full bg-primary/10 flex items-center justify-center">
                 <Check className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               </div>
-              <h3 className="font-semibold text-sm sm:text-base mb-1">Zpráva odeslána!</h3>
+              <h3 className="font-semibold text-sm sm:text-base mb-1">Odesláno!</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">
-                Prodejce vám odpoví do vaší schránky
+                Přesměrování do chatu…
               </p>
             </div>
           ) : (
             <>
-              {product.negotiable && (
-                <div className="mb-3 sm:mb-4">
-                  <label htmlFor="offer-amount" className="text-xs sm:text-sm font-medium text-foreground block mb-1.5">
-                    Vaše nabídka (Kč) — volitelné
-                  </label>
-                  <input
-                    id="offer-amount"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="např. 1 500"
-                    value={offerAmount}
-                    onChange={(e) => setOfferAmount(e.target.value.replace(/[^\d\s]/g, ''))}
-                    className="flex h-9 sm:h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                </div>
+              {dialogMode === 'buy' && (
+                <>
+                  <div className="p-3 sm:p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg mb-3 sm:mb-4">
+                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Koupě je závazná.</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                      Koupě je závazná – po potvrzení bude inzerát označen jako prodaný a přestane se zobrazovat v nabídce. S prodejcem si poté domluvíte předání v chatu.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 sm:gap-3">
+                    <Button variant="outline" className="flex-1" onClick={() => setDialogMode(null)}>
+                      Zrušit
+                    </Button>
+                    <Button className="flex-1" onClick={handleBuy} disabled={isSending}>
+                      {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Ano, koupit'}
+                    </Button>
+                  </div>
+                </>
               )}
-              <Textarea
-                placeholder="Dobrý den, mám zájem o toto zboží. Je stále k dispozici?"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={4}
-                className="resize-none text-sm"
-              />
-              <div className="flex gap-2 sm:gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1 bg-transparent text-sm h-9 sm:h-10"
-                  onClick={() => setIsMessageDialogOpen(false)}
-                >
-                  Zrušit
-                </Button>
-                <Button
-                  className="flex-1 text-sm h-9 sm:h-10"
-                  onClick={handleSendMessage}
-                  disabled={isSending || (!message.trim() && !(product.negotiable && offerAmount.trim()))}
-                >
-                  {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Odeslat'}
-                </Button>
-              </div>
+              {dialogMode === 'offer' && (
+                <>
+                  <div className="mb-3 sm:mb-4">
+                    <label htmlFor="offer-amount" className="text-xs sm:text-sm font-medium text-foreground block mb-1.5">
+                      Vaše nabídka (Kč)
+                    </label>
+                    <input
+                      id="offer-amount"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="např. 1 500"
+                      value={offerAmount}
+                      onChange={(e) => setOfferAmount(e.target.value.replace(/[^\d\s]/g, ''))}
+                      className="flex h-9 sm:h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </div>
+                  <div className="flex gap-2 sm:gap-3">
+                    <Button variant="outline" className="flex-1" onClick={() => setDialogMode(null)}>
+                      Zrušit
+                    </Button>
+                    <Button className="flex-1" onClick={handleOffer} disabled={isSending || !offerAmount.trim()}>
+                      {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Odeslat nabídku'}
+                    </Button>
+                  </div>
+                </>
+              )}
+              {dialogMode === 'question' && (
+                <>
+                  <Textarea
+                    placeholder="Dobrý den, mám zájem o toto zboží. Je stále k dispozici?"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={4}
+                    className="resize-none text-sm mb-3 sm:mb-4"
+                  />
+                  <div className="flex gap-2 sm:gap-3">
+                    <Button variant="outline" className="flex-1" onClick={() => setDialogMode(null)}>
+                      Zrušit
+                    </Button>
+                    <Button className="flex-1" onClick={handleQuestion} disabled={isSending || !message.trim()}>
+                      {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Odeslat'}
+                    </Button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </DialogContent>

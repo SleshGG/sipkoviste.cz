@@ -7,8 +7,11 @@ import {
   getExistingReview,
   getFavoriteProductIds,
   getConfirmedSale,
+  getProductById,
 } from './database'
 import type { ProductInsert, MessageInsert } from './types'
+import { sendEmail, getUserEmail } from '@/lib/email'
+import { getBuyIntentEmailHtml, getOfferEmailHtml, getOfferAcceptedEmailHtml, getCounterOfferEmailHtml } from '@/lib/email-templates'
 
 // ============ AUTH ACTIONS ============
 
@@ -348,6 +351,434 @@ export async function sendMessageAction(message: Omit<MessageInsert, 'sender_id'
   return { data }
 }
 
+/** Zkontroluje, zda byl v posledních 24h odeslán e-mail (buy/offer) od kupujícího prodejci pro daný produkt. */
+async function hasRecentBuyOrOfferEmail(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  senderId: string,
+  receiverId: string,
+  productId: string
+): Promise<boolean> {
+  // V dev režimu jen 1 minuta (pro snadnější testování), v produkci 24h
+  const hours = process.env.NODE_ENV === 'development' ? 1 / 60 : 24
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+  const { data } = await supabase
+    .from('messages')
+    .select('id')
+    .eq('sender_id', senderId)
+    .eq('receiver_id', receiverId)
+    .eq('product_id', productId)
+    .in('message_type', ['buy', 'offer'])
+    .gte('created_at', since)
+    .limit(1)
+  return (data?.length ?? 0) > 0
+}
+
+/** Koupit – vytvoří zprávu, označí inzerát jako prodaný, pošle e-mail prodejci, přesměruje do chatu. */
+export async function sendBuyIntentAction(
+  productId: string,
+  receiverId: string,
+  productName: string,
+  sellerName: string
+): Promise<{ error?: string; data?: { id: string } }> {
+  if (!UUID_REGEX.test(productId) || !UUID_REGEX.test(receiverId)) {
+    return { error: 'Neplatné ID.' }
+  }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Musíte být přihlášeni.' }
+  if (user.id === receiverId) return { error: 'Nemůžete koupit vlastní inzerát.' }
+
+  const { data: product } = await supabase
+    .from('products')
+    .select('id, sold_at')
+    .eq('id', productId)
+    .single()
+  if (!product) return { error: 'Inzerát nenalezen.' }
+  if (product.sold_at) return { error: 'Tento inzerát byl již prodán.' }
+
+  const { data: existingSale } = await supabase
+    .from('confirmed_sales')
+    .select('id')
+    .eq('product_id', productId)
+    .limit(1)
+    .maybeSingle()
+  if (existingSale) return { error: 'Tento inzerát byl již prodán.' }
+
+  const alreadySent = await hasRecentBuyOrOfferEmail(supabase, user.id, receiverId, productId)
+  const { data: buyerProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single()
+  const buyerName = buyerProfile?.name?.trim() || 'Kupující'
+  const insertData = {
+    receiver_id: receiverId,
+    product_id: productId,
+    text: `${buyerName} koupil tento produkt. Domluvte si prosím podrobnosti. Šipkobot`,
+    sender_id: user.id,
+    message_type: 'buy' as const,
+  }
+  const { data: msg, error } = await supabase
+    .from('messages')
+    .insert(insertData)
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error('Error sending buy intent:', error)
+    return { error: 'Nepodařilo se odeslat.' }
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Email] Koupit: alreadySent=', alreadySent, 'receiverId=', receiverId)
+  }
+  if (!alreadySent) {
+    const sellerEmail = await getUserEmail(receiverId)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Email] Koupit: sellerEmail=', sellerEmail ?? 'NULL')
+    }
+    if (sellerEmail) {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+      const chatUrl = `${siteUrl}/messages?to=${user.id}&product=${productId}`
+      const html = getBuyIntentEmailHtml(sellerName, productName, chatUrl)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Email] Koupit: volám sendEmail ->', sellerEmail)
+      }
+      await sendEmail(sellerEmail, `Někdo koupil: ${productName}`, html)
+    } else if (process.env.NODE_ENV === 'development') {
+      console.warn('[Email] Koupit: e-mail prodejce nenalezen – zkontroluj SUPABASE_SERVICE_ROLE_KEY')
+    }
+  } else if (process.env.NODE_ENV === 'development') {
+    console.log('[Email] Koupit: e-mail přeskočen (alreadySent – v posledních 24h již byl odeslán buy/offer pro tento produkt)')
+  }
+
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!key || !url) {
+    console.error('[Email] Koupit: chybí SUPABASE_SERVICE_ROLE_KEY – nelze označit inzerát jako prodaný')
+    revalidatePath('/messages')
+    return { error: 'Nepodařilo se označit inzerát jako prodaný. Zkontrolujte nastavení serveru (SUPABASE_SERVICE_ROLE_KEY).' }
+  }
+  const { createClient: createAdminClient } = await import('@supabase/supabase-js')
+  const admin = createAdminClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { error: updateErr } = await admin
+    .from('products')
+    .update({ sold_at: new Date().toISOString() })
+    .eq('id', productId)
+    .eq('seller_id', receiverId)
+  if (updateErr) {
+    console.error('[Email] Koupit: chyba při označení jako prodaný:', updateErr)
+    revalidatePath('/messages')
+    return { error: 'Zpráva odeslána, ale nepodařilo se označit inzerát jako prodaný. Zkuste to znovu nebo kontaktujte podporu.' }
+  }
+  const productForSale = await getProductById(productId)
+  const { error: insertErr } = await admin.from('confirmed_sales').insert({
+    product_id: productId,
+    buyer_id: user.id,
+    seller_id: receiverId,
+    confirmed_by: user.id,
+    sale_price: productForSale?.price ?? null,
+  })
+  if (insertErr) {
+    console.error('[Email] Koupit: chyba při vytváření confirmed_sales:', insertErr)
+  }
+
+  revalidatePath('/messages')
+  revalidatePath('/marketplace')
+  revalidatePath('/')
+  revalidatePath(`/product/${productId}`)
+  revalidatePath(`/profile/${receiverId}`)
+  return { data: msg }
+}
+
+/** Nabídnout cenu – vytvoří zprávu s nabídkou, pošle e-mail prodejci. */
+export async function sendOfferAction(
+  productId: string,
+  receiverId: string,
+  productName: string,
+  sellerName: string,
+  amount: number
+): Promise<{ error?: string; data?: { id: string } }> {
+  if (!UUID_REGEX.test(productId) || !UUID_REGEX.test(receiverId)) {
+    return { error: 'Neplatné ID.' }
+  }
+  if (amount < 1 || amount > 999_999_999) return { error: 'Neplatná částka.' }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Musíte být přihlášeni.' }
+  if (user.id === receiverId) return { error: 'Nemůžete nabídnout na vlastní inzerát.' }
+
+  const alreadySent = await hasRecentBuyOrOfferEmail(supabase, user.id, receiverId, productId)
+  const { data: buyerProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single()
+  const buyerName = buyerProfile?.name?.trim() || 'Uživatel'
+  const formatted = amount.toLocaleString('cs-CZ')
+  const insertData = {
+    receiver_id: receiverId,
+    product_id: productId,
+    text: `${buyerName} nabídl ${formatted} Kč. Šipkobot`,
+    sender_id: user.id,
+    message_type: 'offer' as const,
+    offer_amount: amount,
+    offer_status: 'pending' as const,
+  }
+  const { data: msg, error } = await supabase
+    .from('messages')
+    .insert(insertData)
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error('Error sending offer:', error)
+    return { error: 'Nepodařilo se odeslat nabídku.' }
+  }
+
+  if (!alreadySent) {
+    const sellerEmail = await getUserEmail(receiverId)
+    if (sellerEmail) {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+      const chatUrl = `${siteUrl}/messages?to=${user.id}&product=${productId}`
+      const html = getOfferEmailHtml(sellerName, productName, formatted, chatUrl)
+      await sendEmail(sellerEmail, `Nabídka ${formatted} Kč: ${productName}`, html)
+    } else if (process.env.NODE_ENV === 'development') {
+      console.warn('[Email] Nabídka: e-mail prodejce nenalezen')
+    }
+  }
+
+  revalidatePath('/messages')
+  return { data: msg }
+}
+
+/** Poslat dotaz – vytvoří zprávu bez e-mailu. */
+export async function sendQuestionAction(
+  productId: string,
+  receiverId: string,
+  text: string
+): Promise<{ error?: string; data?: { id: string } }> {
+  const trimmed = text?.trim()
+  if (!trimmed || trimmed.length < 1) return { error: 'Zpráva nesmí být prázdná.' }
+  if (trimmed.length > 5000) return { error: 'Zpráva je příliš dlouhá.' }
+  if (!UUID_REGEX.test(productId) || !UUID_REGEX.test(receiverId)) {
+    return { error: 'Neplatné ID.' }
+  }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Musíte být přihlášeni.' }
+
+  const insertData = {
+    receiver_id: receiverId,
+    product_id: productId,
+    text: trimmed,
+    sender_id: user.id,
+    message_type: 'question' as const,
+  }
+  const { data: msg, error } = await supabase
+    .from('messages')
+    .insert(insertData)
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error('Error sending question:', error)
+    return { error: 'Nepodařilo se odeslat zprávu.' }
+  }
+
+  revalidatePath('/messages')
+  return { data: msg }
+}
+
+/** Prodejce přijme nabídku – pošle e-mail kupujícímu. */
+export async function acceptOfferAction(messageId: string): Promise<{ error?: string }> {
+  if (!UUID_REGEX.test(messageId)) return { error: 'Neplatné ID zprávy.' }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Musíte být přihlášeni.' }
+
+  const { data: msg, error: fetchErr } = await supabase
+    .from('messages')
+    .select('id, sender_id, receiver_id, product_id, offer_amount, offer_status, message_type')
+    .eq('id', messageId)
+    .single()
+
+  if (fetchErr || !msg) return { error: 'Zpráva nenalezena.' }
+  if (msg.receiver_id !== user.id) return { error: 'Tuto nabídku můžete přijmout pouze vy jako prodejce.' }
+  if (msg.message_type !== 'offer') return { error: 'Tato zpráva není nabídka.' }
+  if (msg.offer_status === 'accepted' || msg.offer_status === 'rejected') {
+    return { error: 'Tato nabídka již byla zpracována.' }
+  }
+
+  const { error: updateErr } = await supabase
+    .from('messages')
+    .update({ offer_status: 'accepted' })
+    .eq('id', messageId)
+
+  if (updateErr) {
+    console.error('Error accepting offer:', updateErr)
+    return { error: 'Nepodařilo se přijmout nabídku.' }
+  }
+
+  const productId = msg.product_id
+  const product = productId ? await getProductById(productId) : null
+  const productSellerId = product?.seller_id
+
+  let buyerId: string
+  let sellerId: string
+  if (productSellerId) {
+    sellerId = productSellerId
+    buyerId = user.id === productSellerId ? msg.sender_id : msg.receiver_id
+  } else {
+    buyerId = msg.sender_id
+    sellerId = msg.receiver_id
+  }
+
+  if (productId && productSellerId) {
+    const { data: productRow } = await supabase
+      .from('products')
+      .select('id, sold_at')
+      .eq('id', productId)
+      .single()
+    const { data: existingSale } = await supabase
+      .from('confirmed_sales')
+      .select('id')
+      .eq('product_id', productId)
+      .limit(1)
+      .maybeSingle()
+
+    if (productRow && !productRow.sold_at && !existingSale) {
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+      if (key && url) {
+        const { createClient: createAdminClient } = await import('@supabase/supabase-js')
+        const admin = createAdminClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+        await admin.from('products').update({ sold_at: new Date().toISOString() }).eq('id', productId).eq('seller_id', sellerId)
+        await admin.from('confirmed_sales').insert({
+          product_id: productId,
+          buyer_id: buyerId,
+          seller_id: sellerId,
+          confirmed_by: user.id,
+          sale_price: msg.offer_amount ?? null,
+        })
+      }
+      revalidatePath('/marketplace')
+      revalidatePath('/')
+      revalidatePath(`/product/${productId}`)
+      revalidatePath(`/profile/${productSellerId}`)
+    }
+  }
+
+  const offerRecipientEmail = await getUserEmail(msg.sender_id)
+  if (offerRecipientEmail && msg.product_id) {
+    const product = await getProductById(msg.product_id)
+    const productName = product?.name ?? 'produkt'
+    const formatted = (msg.offer_amount ?? 0).toLocaleString('cs-CZ')
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+    const chatUrl = `${siteUrl}/messages?to=${user.id}&product=${msg.product_id}`
+    const html = getOfferAcceptedEmailHtml(productName, formatted, chatUrl)
+    await sendEmail(offerRecipientEmail, `Prodejce přijímá vaši nabídku: ${productName}`, html)
+  }
+
+  revalidatePath('/messages')
+  return {}
+}
+
+/** Prodejce odmítne nabídku – bez e-mailu. */
+export async function rejectOfferAction(messageId: string): Promise<{ error?: string }> {
+  if (!UUID_REGEX.test(messageId)) return { error: 'Neplatné ID zprávy.' }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Musíte být přihlášeni.' }
+
+  const { data: msg } = await supabase
+    .from('messages')
+    .select('id, receiver_id, offer_status')
+    .eq('id', messageId)
+    .single()
+
+  if (!msg || msg.receiver_id !== user.id) return { error: 'Zpráva nenalezena.' }
+  if (msg.offer_status === 'accepted' || msg.offer_status === 'rejected') {
+    return { error: 'Tato nabídka již byla zpracována.' }
+  }
+
+  const { error } = await supabase
+    .from('messages')
+    .update({ offer_status: 'rejected' })
+    .eq('id', messageId)
+
+  if (error) {
+    console.error('Error rejecting offer:', error)
+    return { error: 'Nepodařilo se odmítnout nabídku.' }
+  }
+
+  revalidatePath('/messages')
+  return {}
+}
+
+/** Prodejce pošle protinabídku – odmítne původní nabídku a vytvoří novou s jinou částkou. */
+export async function sendCounterOfferAction(
+  originalMessageId: string,
+  amount: number
+): Promise<{ error?: string; data?: { id: string } }> {
+  if (!UUID_REGEX.test(originalMessageId)) return { error: 'Neplatné ID zprávy.' }
+  if (amount < 1 || amount > 999_999_999) return { error: 'Neplatná částka.' }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Musíte být přihlášeni.' }
+
+  const { data: origMsg, error: fetchErr } = await supabase
+    .from('messages')
+    .select('id, sender_id, receiver_id, product_id, offer_status, message_type')
+    .eq('id', originalMessageId)
+    .single()
+
+  if (fetchErr || !origMsg) return { error: 'Zpráva nenalezena.' }
+  if (origMsg.receiver_id !== user.id) return { error: 'Protinabídku může odeslat pouze prodejce.' }
+  if (origMsg.message_type !== 'offer') return { error: 'Tato zpráva není nabídka.' }
+  if (origMsg.offer_status === 'accepted' || origMsg.offer_status === 'rejected') {
+    return { error: 'Tato nabídka již byla zpracována.' }
+  }
+  if (!origMsg.product_id) return { error: 'Nabídka nemá přiřazený produkt.' }
+
+  await supabase
+    .from('messages')
+    .update({ offer_status: 'rejected' })
+    .eq('id', originalMessageId)
+
+  const { data: sellerProfile } = await supabase.from('profiles').select('name').eq('id', user.id).single()
+  const sellerName = sellerProfile?.name?.trim() || 'Prodejce'
+  const formatted = amount.toLocaleString('cs-CZ')
+  const insertData = {
+    receiver_id: origMsg.sender_id,
+    product_id: origMsg.product_id,
+    text: `${sellerName} udělal protinabídku ${formatted} Kč. Šipkobot`,
+    sender_id: user.id,
+    message_type: 'offer' as const,
+    offer_amount: amount,
+    offer_status: 'pending' as const,
+  }
+  const { data: newMsg, error: insertErr } = await supabase
+    .from('messages')
+    .insert(insertData)
+    .select('id')
+    .single()
+
+  if (insertErr) {
+    console.error('Error sending counter-offer:', insertErr)
+    return { error: 'Nepodařilo se odeslat protinabídku.' }
+  }
+
+  const buyerEmail = await getUserEmail(origMsg.sender_id)
+  if (buyerEmail) {
+    const product = await getProductById(origMsg.product_id)
+    const productName = product?.name ?? 'produkt'
+    const { data: buyerProfile } = await supabase.from('profiles').select('name').eq('id', origMsg.sender_id).single()
+    const buyerName = buyerProfile?.name?.trim() || 'Kupující'
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+    const chatUrl = `${siteUrl}/messages?to=${user.id}&product=${origMsg.product_id}`
+    const html = getCounterOfferEmailHtml(buyerName, sellerName, productName, formatted, chatUrl)
+    await sendEmail(buyerEmail, `Protinabídka ${formatted} Kč: ${productName}`, html)
+  }
+
+  revalidatePath('/messages')
+  return { data: newMsg }
+}
+
 export async function markMessagesAsReadAction(senderId: string, productId: string | null) {
   if (!UUID_REGEX.test(senderId)) return { error: 'Neplatné ID.' }
   if (productId !== null && !UUID_REGEX.test(productId)) return { error: 'Neplatné ID.' }
@@ -433,77 +864,6 @@ export async function submitReviewAction(params: {
 
 // ============ CONFIRMED SALES ============
 
-/** Prodej potvrdí jen prodejce. otherUserId = kupující (druhý účastník), productSellerId = seller_id produktu. */
-export async function confirmSaleAction(
-  productId: string,
-  otherUserId: string,
-  productSellerId: string
-): Promise<{ error?: string }> {
-  if (!UUID_REGEX.test(productId) || !UUID_REGEX.test(otherUserId) || !UUID_REGEX.test(productSellerId)) {
-    return { error: 'Neplatné ID.' }
-  }
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Musíte být přihlášeni' }
-  }
-
-  if (user.id !== productSellerId) {
-    return { error: 'Prodej může potvrdit pouze prodejce.' }
-  }
-
-  const buyerId = otherUserId
-  const sellerId = productSellerId
-  if (buyerId === sellerId) {
-    return { error: 'Kupující a prodejce musí být různé osoby.' }
-  }
-
-  const { data: existingSale } = await supabase
-    .from('confirmed_sales')
-    .select('id')
-    .eq('product_id', productId)
-    .limit(1)
-    .maybeSingle()
-
-  if (existingSale) {
-    return { error: 'Inzerát byl již prodán jinému kupujícímu.' }
-  }
-
-  const { error } = await supabase.from('confirmed_sales').insert({
-    product_id: productId,
-    buyer_id: buyerId,
-    seller_id: sellerId,
-    confirmed_by: user.id,
-  })
-
-  if (error) {
-    if (error.code === '23505') return {} // už potvrzeno (duplicate)
-    console.error('Error confirming sale:', error)
-    if (error.code === '42501' || error.message?.includes('row-level security')) {
-      return { error: 'Nemáte oprávnění potvrdit prodej. Ověřte, že jste přihlášeni jako prodejce.' }
-    }
-    if (error.code === '23503') {
-      return { error: 'Prodej nelze potvrdit (chybí údaje o uživateli nebo produktu).' }
-    }
-    if (error.message?.includes('does not exist') || error.code === '42P01') {
-      return { error: 'Tabulka potvrzených prodejů neexistuje. Spusťte v Supabase skript scripts/005_confirmed_sales.sql' }
-    }
-    return { error: error.message || 'Nepodařilo se potvrdit prodej' }
-  }
-
-  await supabase
-    .from('products')
-    .update({ sold_at: new Date().toISOString() })
-    .eq('id', productId)
-    .eq('seller_id', user.id)
-
-  revalidatePath('/messages')
-  revalidatePath('/marketplace')
-  revalidatePath('/')
-  revalidatePath(`/product/${productId}`)
-  return {}
-}
-
 /** Stav prodeje a hodnocení: confirmed = je potvrzený prodej, canReview = může aktuální uživatel ohodnotit druhého, alreadyReviewed = už ho ohodnotil, productSoldToOther = inzerát byl prodán jinému kupujícímu. */
 export async function getSaleStatusAction(
   productId: string,
@@ -536,7 +896,7 @@ export async function getSaleStatusAction(
   const existing = await getExistingReview(user.id, otherUserId, productId)
   const alreadyReviewed = !!existing
   const canResult = await canUserRateProfile(productId, user.id, otherUserId)
-  const canReview = canResult.ok && !alreadyReviewed
+  const canReview = confirmed && canResult.ok && !alreadyReviewed
 
   return { confirmed, canReview, alreadyReviewed, productSoldToOther }
 }

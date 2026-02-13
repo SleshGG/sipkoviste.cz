@@ -33,6 +33,9 @@ export interface Product {
   created_at: string
 }
 
+export type MessageType = 'question' | 'buy' | 'offer' | null
+export type OfferStatus = 'pending' | 'accepted' | 'rejected' | null
+
 export interface Message {
   id: string
   sender_id: string
@@ -40,6 +43,9 @@ export interface Message {
   product_id: string | null
   text: string
   is_read: boolean
+  message_type?: MessageType
+  offer_amount?: number | null
+  offer_status?: OfferStatus
   created_at: string
 }
 
@@ -87,6 +93,11 @@ export interface ConversationPreview {
 
 // Insert types (without auto-generated fields)
 export type ProductInsert = Omit<Product, 'id' | 'created_at'>
-export type MessageInsert = Omit<Message, 'id' | 'created_at' | 'is_read'> & { product_id?: string | null }
+export type MessageInsert = Omit<Message, 'id' | 'created_at' | 'is_read'> & {
+  product_id?: string | null
+  message_type?: MessageType
+  offer_amount?: number | null
+  offer_status?: OfferStatus
+}
 export type ProfileInsert = Omit<Profile, 'rating' | 'review_count' | 'member_since' | 'response_time'>
 export type ReviewInsert = Omit<Review, 'id' | 'created_at'>
