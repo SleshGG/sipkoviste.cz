@@ -198,101 +198,106 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
     <div className="min-h-screen bg-background pb-20 md:pb-0">
       <Header />
 
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        {/* Back Button */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
-        >
+      <main className="md:container md:mx-auto md:px-4 md:py-6">
+        {/* Mobil: fotka 4:3, 100% šířka pod headerem, tlačítko zpět ve fotce */}
+        <div className="md:hidden relative w-full h-[60vh] bg-secondary -mt-px overflow-hidden">
           <Button
             variant="ghost"
-            size="sm"
-            className="mb-3 sm:mb-4 gap-2 -ml-2 sm:ml-0"
+            size="icon"
+            className="absolute left-3 top-3 z-20 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white border-0"
             onClick={() => router.back()}
+            aria-label="Zpět"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Zpět
+            <ArrowLeft className="h-5 w-5" />
           </Button>
-        </motion.div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={selectedImageIndex}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="relative w-full h-full cursor-pointer"
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setLightboxIndex(selectedImageIndex)
+                setIsImageLightboxOpen(true)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setLightboxIndex(selectedImageIndex)
+                  setIsImageLightboxOpen(true)
+                }
+              }}
+              aria-label="Zvětšit obrázek"
+            >
+              <Image
+                src={images[selectedImageIndex] || "/placeholder.svg"}
+                alt={product.name}
+                fill
+                className="object-cover"
+                priority
+                loading="eager"
+                sizes="100vw"
+              />
+            </motion.div>
+          </AnimatePresence>
+          {images.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSelectedImageIndex((selectedImageIndex - 1 + images.length) % images.length)
+                }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 !bg-white !text-black border !border-white/50 rounded-lg p-2 flex items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90 shadow-md"
+                aria-label="Předchozí fotka"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setSelectedImageIndex((selectedImageIndex + 1) % images.length)
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 !bg-white !text-black border !border-white/50 rounded-lg p-2 flex items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90 shadow-md"
+                aria-label="Další fotka"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </>
+          )}
+        </div>
 
-        <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-          {/* Image Gallery */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="w-full lg:min-w-0"
-          >
-            <div className="overflow-hidden rounded-none sm:rounded-lg">
-              {/* Mobil: jedna fotka + posuvníky */}
-              <div className="md:hidden">
-                <div className="relative aspect-[4/3] sm:aspect-square bg-secondary">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={selectedImageIndex}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="relative w-full h-full cursor-pointer focus:outline-none focus-visible:outline-none focus-visible:ring-0"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        setLightboxIndex(selectedImageIndex)
-                        setIsImageLightboxOpen(true)
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          setLightboxIndex(selectedImageIndex)
-                          setIsImageLightboxOpen(true)
-                        }
-                      }}
-                      aria-label="Zvětšit obrázek"
-                    >
-                      <Image
-                        src={images[selectedImageIndex] || "/placeholder.svg"}
-                        alt={product.name}
-                        fill
-                        className="object-cover"
-                        priority
-                        loading="eager"
-                        sizes="(max-width: 768px) 90vw, 420px"
-                      />
-                    </motion.div>
-                  </AnimatePresence>
-                  {images.length > 1 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedImageIndex((selectedImageIndex - 1 + images.length) % images.length)
-                        }}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 !bg-white !text-black border !border-white/50 rounded-lg p-2 flex items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90 shadow-md"
-                        aria-label="Předchozí fotka"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedImageIndex((selectedImageIndex + 1) % images.length)
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 !bg-white !text-black border !border-white/50 rounded-lg p-2 flex items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90 shadow-md"
-                        aria-label="Další fotka"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
+        <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 px-3 sm:px-4 pt-4 md:pt-0 md:px-0">
+          {/* Levý sloupec: Back + Image Gallery – jen desktop */}
+          <div className="hidden md:block w-full lg:min-w-0">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mb-3 sm:mb-4 gap-2 -ml-2 sm:ml-0"
+                onClick={() => router.back()}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Zpět
+              </Button>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+            <div className="overflow-hidden rounded-lg">
               {/* PC: vlevo na výšku, vpravo dvě čtverce pod sebou – 2/3 + 1/3, přes celou půlku */}
-              <div className="hidden md:block w-full">
+              <div className="w-full">
                 {images.length === 1 ? (
                   <div className="w-full aspect-[4/3]">
                     <button
@@ -360,7 +365,7 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
                     ))}
                   </div>
                 )}
-                  {images.length > 3 && (
+                {images.length > 3 && (
                     <div className="grid grid-cols-3 gap-3 mt-3">
                       {images.slice(3).map((image, index) => (
                         <button
@@ -386,7 +391,8 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
                   )}
               </div>
             </div>
-          </motion.div>
+            </motion.div>
+          </div>
 
           {/* Product Info */}
           <motion.div
