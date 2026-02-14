@@ -24,16 +24,22 @@ interface ProductCardProps {
   /** Zobrazit počet zobrazení (jen u vlastních inzerátů na profilu) */
   showViewCount?: boolean
   viewCount?: number
+  /** Kam se vrátit po kliknutí na zpět v detailu produktu */
+  returnUrl?: string
 }
 
-export function ProductCard({ product, index = 0, showFavorite, isFavorite, onToggleFavorite, isTogglingFavorite, favoriteCount = 0, priority, showViewCount, viewCount = 0 }: ProductCardProps) {
+export function ProductCard({ product, index = 0, showFavorite, isFavorite, onToggleFavorite, isTogglingFavorite, favoriteCount = 0, priority, showViewCount, viewCount = 0, returnUrl }: ProductCardProps) {
+  const fromParam = returnUrl === '/' ? '.' : (returnUrl?.replace(/^\//, '') ?? '')
+  const productHref = returnUrl
+    ? `/product/${product.id}?from=${encodeURIComponent(fromParam)}`
+    : `/product/${product.id}`
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
     >
-      <Link href={`/product/${product.id}`}>
+      <Link href={productHref}>
         <Card className={`group overflow-hidden border-border bg-card transition-all duration-300 py-0 h-full flex flex-col gap-3 ${
           'sold_at' in product && product.sold_at
             ? 'opacity-75 hover:opacity-90'
@@ -73,7 +79,7 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
               )}
             </div>
             {!('sold_at' in product && product.sold_at) && (
-              <div className={`absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 flex items-center gap-0.5 rounded-full bg-background/80 pl-2.5 pr-3 py-1 ${favoriteCount <= 0 && !showFavorite ? 'justify-center pr-2.5' : ''}`}>
+              <div className={`absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 flex items-center gap-0.5 rounded-lg border border-border bg-secondary pl-2.5 pr-3 py-1 ${favoriteCount <= 0 && !showFavorite ? 'justify-center pr-2.5' : ''}`}>
                 {showFavorite && onToggleFavorite ? (
                   <Button
                     variant="ghost"
@@ -90,7 +96,7 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
                     {isTogglingFavorite ? (
                       <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
                     ) : (
-                      <Heart className={`h-3.5 w-3.5 sm:h-4 sm:w-4 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'group-hover/heart:fill-red-500 group-hover/heart:text-red-500'}`} />
+                      <Heart className={`h-3.5 w-3.5 sm:h-4 sm:w-4 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'text-muted-foreground group-hover/heart:fill-red-500 group-hover/heart:text-red-500'}`} />
                     )}
                   </Button>
                 ) : (

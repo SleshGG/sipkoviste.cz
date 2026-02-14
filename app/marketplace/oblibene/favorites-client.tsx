@@ -41,11 +41,12 @@ export function FavoritesClient({ products, favoriteIds, favoriteCounts }: Favor
 
       <main className="container mx-auto px-4 py-6">
         <div className="flex items-center gap-4 mb-6">
-          <Link href="/marketplace">
-            <Button variant="ghost" size="sm" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Zpět na tržiště
-            </Button>
+          <Link
+            href="/marketplace"
+            className="relative z-[60] inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+            aria-label="Zpět"
+          >
+            <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
           </Link>
         </div>
 
@@ -73,6 +74,7 @@ export function FavoritesClient({ products, favoriteIds, favoriteCounts }: Favor
                 onToggleFavorite={handleToggleFavorite}
                 isTogglingFavorite={togglingProductId === product.id}
                 favoriteCount={favoriteCounts[product.id] ?? 0}
+                returnUrl="/marketplace/oblibene"
               />
             ))}
           </div>

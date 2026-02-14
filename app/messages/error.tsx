@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { MessageCircle } from 'lucide-react'
+import { ArrowLeft, MessageCircle } from 'lucide-react'
 
 export default function MessagesError({
   error,
@@ -28,9 +28,13 @@ export default function MessagesError({
         </p>
         <div className="flex flex-col sm:flex-row gap-2 justify-center">
           <Button onClick={reset}>Zkusit znovu</Button>
-          <Button variant="outline" asChild>
-            <Link href="/">Zpět na úvod</Link>
-          </Button>
+          <Link
+            href="/"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+            aria-label="Zpět na úvod"
+          >
+            <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
+          </Link>
         </div>
       </div>
     </div>

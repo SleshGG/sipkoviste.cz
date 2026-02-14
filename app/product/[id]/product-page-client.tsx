@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Header } from '@/components/header'
 import { MobileNav } from '@/components/mobile-nav'
+import { ProductScrollProvider } from '@/lib/product-scroll-context'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -32,8 +33,6 @@ import {
   CheckCircle2,
   Loader2,
   X,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react'
 import type { Product as MockProduct } from '@/lib/data'
 import type { ProductWithSeller } from '@/lib/supabase/types'
@@ -61,10 +60,31 @@ const categoryLabels: Record<string, string> = {
 interface ProductPageClientProps {
   product: Product
   favoriteCount?: number
+  returnUrl?: string
 }
 
-export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageClientProps) {
+function parseReturnUrl(raw: string | null | undefined): string | undefined {
+  if (!raw || typeof raw !== 'string') return undefined
+  if (raw === '.' || raw === '_') return '/'
+  if (raw.startsWith('/')) return raw
+  return `/${raw}`
+}
+
+export function ProductPageClient({ product, favoriteCount = 0, returnUrl: returnUrlProp }: ProductPageClientProps) {
   const router = useRouter()
+  const returnUrl = (() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const from = new URLSearchParams(window.location.search).get('from')
+        const parsed = parseReturnUrl(from)
+        if (parsed) return parsed
+      } catch {
+        /* ignore */
+      }
+    }
+    return parseReturnUrl(returnUrlProp)
+  })()
+  const backHref = (returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')) ? returnUrl : '/marketplace'
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [dialogMode, setDialogMode] = useState<'buy' | 'offer' | 'question' | null>(null)
   const [isSafetyDialogOpen, setIsSafetyDialogOpen] = useState(false)
@@ -77,6 +97,8 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
   const [isImageLightboxOpen, setIsImageLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [offerAmount, setOfferAmount] = useState('')
+  const touchStartX = useRef<number | null>(null)
+  const didSwipe = useRef(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -195,21 +217,20 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
   const images = (product.images && product.images.length > 0) ? product.images : (product.image ? [product.image] : ['/placeholder.svg'])
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
-      <Header />
-
+    <ProductScrollProvider
+      header={<Header />}
+    >
+      <div className="min-h-screen md:min-h-0 bg-background pb-20 md:pb-0">
       <main className="md:container md:mx-auto md:px-4 md:py-6">
         {/* Mobil: fotka 4:3, 100% šířka pod headerem, tlačítko zpět ve fotce */}
-        <div className="md:hidden relative w-full h-[60vh] bg-secondary -mt-px overflow-hidden">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute left-3 top-3 z-20 h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white border-0"
-            onClick={() => router.back()}
+        <div className="md:hidden relative w-full h-[55vh] bg-secondary -mt-px overflow-hidden">
+          <a
+            href={backHref}
+            className="absolute left-3 top-3 z-[60] h-10 w-10 min-w-10 min-h-10 rounded-lg border border-border bg-secondary flex items-center justify-center text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
             aria-label="Zpět"
           >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+            <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
+          </a>
           <AnimatePresence mode="wait">
             <motion.div
               key={selectedImageIndex}
@@ -217,12 +238,27 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="relative w-full h-full cursor-pointer"
+              className="relative w-full h-full cursor-pointer touch-pan-y"
               role="button"
               tabIndex={0}
+              onTouchStart={(e) => {
+                touchStartX.current = e.touches[0].clientX
+                didSwipe.current = false
+              }}
+              onTouchEnd={(e) => {
+                if (touchStartX.current === null || images.length <= 1) return
+                const deltaX = e.changedTouches[0].clientX - touchStartX.current
+                touchStartX.current = null
+                if (Math.abs(deltaX) < 50) return
+                didSwipe.current = true
+                setSelectedImageIndex((prev) =>
+                  deltaX > 0 ? (prev - 1 + images.length) % images.length : (prev + 1) % images.length
+                )
+              }}
               onClick={() => {
-                setLightboxIndex(selectedImageIndex)
+                if (didSwipe.current) return
                 setIsImageLightboxOpen(true)
+                setLightboxIndex(selectedImageIndex)
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -245,30 +281,22 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
             </motion.div>
           </AnimatePresence>
           {images.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setSelectedImageIndex((selectedImageIndex - 1 + images.length) % images.length)
-                }}
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 !bg-white !text-black border !border-white/50 rounded-lg p-2 flex items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90 shadow-md"
-                aria-label="Předchozí fotka"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setSelectedImageIndex((selectedImageIndex + 1) % images.length)
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 !bg-white !text-black border !border-white/50 rounded-lg p-2 flex items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90 shadow-md"
-                aria-label="Další fotka"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </>
+            <div className="absolute bottom-3 left-0 right-0 z-10 flex justify-center gap-1.5">
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedImageIndex(i)
+                  }}
+                  className={`h-2 w-2 rounded-full transition-colors ${
+                    i === selectedImageIndex ? 'bg-white' : 'bg-white/50'
+                  }`}
+                  aria-label={`Fotka ${i + 1}`}
+                />
+              ))}
+            </div>
           )}
         </div>
 
@@ -280,15 +308,13 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mb-3 sm:mb-4 gap-2 -ml-2 sm:ml-0"
-                onClick={() => router.back()}
+              <a
+                href={backHref}
+                className="relative z-[60] inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors mb-3 sm:mb-4"
+                aria-label="Zpět"
               >
-                <ArrowLeft className="h-4 w-4" />
-                Zpět
-              </Button>
+                <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
+              </a>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -408,25 +434,25 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
                   {product.condition}
                 </Badge>
                 <div className="flex items-center gap-1 sm:gap-2">
-                  <div className={`flex items-center gap-0.5 rounded-full border border-border bg-background/80 pl-2.5 pr-3 py-1 sm:pl-2.5 sm:pr-3 sm:py-1.5 ${favoriteCount <= 0 && !currentUserId ? 'justify-center pr-2.5 sm:pr-2.5' : ''}`}>
+                  <div className={`flex h-10 min-h-10 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-2.5 hover:bg-secondary/80 transition-colors ${favoriteCount <= 0 ? 'w-10' : 'min-w-10'}`}>
                     {currentUserId ? (
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={handleToggleFavorite}
                         disabled={isTogglingFavorite}
-                        className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-transparent group/heart"
+                        className="h-8 w-8 hover:bg-transparent group/heart"
                         title={isFavorited ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
                       >
                         {isTogglingFavorite ? (
-                          <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                          <Loader2 className="size-5 animate-spin" />
                         ) : (
-                          <Heart className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors ${isFavorited ? 'fill-red-500 text-red-500' : 'group-hover/heart:fill-red-500 group-hover/heart:text-red-500'}`} />
+                          <Heart className={`size-5 transition-colors ${isFavorited ? 'fill-red-500 text-red-500' : 'text-muted-foreground group-hover/heart:fill-red-500 group-hover/heart:text-red-500'}`} />
                         )}
                       </Button>
                     ) : (
-                      <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center" title="Přihlaste se pro přidání do oblíbených">
-                        <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                      <span className="flex h-8 w-8 items-center justify-center" title="Přihlaste se pro přidání do oblíbených">
+                        <Heart className="size-5 text-muted-foreground" />
                       </span>
                     )}
                     {favoriteCount > 0 && (
@@ -435,15 +461,14 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
                       </span>
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 sm:h-10 sm:w-10"
+                  <button
+                    type="button"
                     onClick={handleShare}
                     title="Sdílet"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
                   >
-                    <Share2 className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </Button>
+                    <Share2 className="size-5 shrink-0" />
+                  </button>
                 </div>
               </div>
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-1 sm:mb-2">{product.name}</h1>
@@ -750,24 +775,19 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
                 <span className="text-sm font-medium">Zavřít</span>
               </DialogClose>
               {images.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setLightboxIndex((lightboxIndex - 1 + images.length) % images.length)}
-                    className="flex !bg-white !text-black border !border-white/50 rounded-lg p-2 absolute left-4 top-1/2 -translate-y-1/2 z-50 items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90"
-                    aria-label="Předchozí fotka"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLightboxIndex((lightboxIndex + 1) % images.length)}
-                    className="flex !bg-white !text-black border !border-white/50 rounded-lg p-2 absolute right-4 top-1/2 -translate-y-1/2 z-50 items-center justify-center focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 hover:!bg-white/90 active:!bg-white/90"
-                    aria-label="Další fotka"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </>
+                <div className="absolute bottom-4 left-0 right-0 z-50 flex justify-center gap-1.5">
+                  {images.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setLightboxIndex(i)}
+                      className={`h-2 w-2 rounded-full transition-colors ${
+                        i === lightboxIndex ? 'bg-white' : 'bg-white/50'
+                      }`}
+                      aria-label={`Fotka ${i + 1}`}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -812,5 +832,6 @@ export function ProductPageClient({ product, favoriteCount = 0 }: ProductPageCli
 
       <MobileNav />
     </div>
+    </ProductScrollProvider>
   )
 }

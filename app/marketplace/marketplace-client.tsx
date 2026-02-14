@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Header } from '@/components/header'
 import { MobileNav } from '@/components/mobile-nav'
@@ -32,6 +32,8 @@ interface MarketplaceClientProps {
 export function MarketplaceClient({ initialProducts, favoriteCounts = {} }: MarketplaceClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
+  const baseReturnUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '')
   const initialCategory = searchParams.get('category')
   const initialQuery = searchParams.get('q') || ''
 
@@ -49,6 +51,7 @@ export function MarketplaceClient({ initialProducts, favoriteCounts = {} }: Mark
   const [favoriteIds, setFavoriteIds] = useState<string[]>([])
   const [togglingProductId, setTogglingProductId] = useState<string | null>(null)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
+  const returnUrl = showOnlyFavorites && currentUserId ? '/marketplace/oblibene' : baseReturnUrl
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
@@ -347,6 +350,7 @@ export function MarketplaceClient({ initialProducts, favoriteCounts = {} }: Mark
                       onToggleFavorite={handleToggleFavorite}
                       isTogglingFavorite={togglingProductId === product.id}
                       favoriteCount={favoriteCounts[product.id] ?? 0}
+                      returnUrl={returnUrl}
                     />
                   ))}
                 </AnimatePresence>

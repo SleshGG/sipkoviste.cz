@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { MobileNav } from '@/components/mobile-nav'
-import { Button } from '@/components/ui/button'
 import { ArrowLeft, Mail, Building2 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -16,11 +15,12 @@ export default function SoukromiPage() {
     <div className="min-h-screen bg-background pb-20 md:pb-0">
       <Header />
       <main className="container mx-auto px-4 py-8 max-w-3xl">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="mb-6 -ml-2 gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Zpět na úvod
-          </Button>
+        <Link
+          href="/"
+          className="mb-6 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+          aria-label="Zpět na úvod"
+        >
+          <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
         </Link>
 
         <h1 className="text-2xl md:text-4xl font-bold text-foreground mb-2">Ochrana osobních údajů</h1>

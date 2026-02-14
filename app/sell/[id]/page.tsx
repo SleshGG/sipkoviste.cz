@@ -288,8 +288,12 @@ export default function EditListingPage() {
         <main className="container mx-auto px-4 py-16 text-center">
           <h1 className="text-xl font-semibold mb-2">Inzerát nenalezen</h1>
           <p className="text-muted-foreground mb-4">Nemáte oprávnění ho upravit, nebo byl smazán.</p>
-          <Link href="/dashboard">
-            <Button>Zpět na nástěnku</Button>
+          <Link
+            href="/dashboard"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+            aria-label="Zpět na nástěnku"
+          >
+            <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
           </Link>
         </main>
         <MobileNav />
@@ -302,12 +306,13 @@ export default function EditListingPage() {
       <Header />
 
       <main className="container mx-auto px-4 py-6 max-w-2xl">
-        <Button variant="ghost" size="sm" className="mb-4 gap-2 -ml-2" asChild>
-          <Link href="/dashboard">
-            <ArrowLeft className="h-4 w-4" />
-            Zpět na nástěnku
-          </Link>
-        </Button>
+        <Link
+          href="/dashboard"
+          className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+          aria-label="Zpět na nástěnku"
+        >
+          <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
+        </Link>
 
         <h1 className="text-2xl font-bold mb-2">Upravit inzerát</h1>
         <p className="text-muted-foreground mb-6">{product.name}</p>

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,9 +21,12 @@ import { createClient } from '@/lib/supabase/client'
 import { signOut } from '@/lib/supabase/actions'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { Profile } from '@/lib/supabase/types'
+import { cn } from '@/lib/utils'
+import { useProductScroll } from '@/lib/product-scroll-context'
 
 export function Header() {
   const router = useRouter()
+  const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState('')
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
@@ -123,15 +126,52 @@ export function Header() {
 
   const isLoggedIn = !!user
 
+  const [showHeader, setShowHeader] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  const isProductDetail = pathname?.match(/^\/product\/[^/]+$/) ?? false
+  const productScrollY = useProductScroll()
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const isMobileView = window.innerWidth < 768
+    if (!isMobileView) {
+      setShowHeader(true)
+      return
+    }
+    if (!isProductDetail) {
+      setShowHeader(true)
+      return
+    }
+    setShowHeader(false)
+  }, [isMobile, isProductDetail])
+
+  const shouldShowHeader = isProductDetail && isMobile ? productScrollY > 50 : showHeader
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 min-w-0 items-center justify-between gap-2 sm:gap-4 px-4">
+    <>
+      <header
+      className={cn(
+        'z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-transform duration-300 ease-out',
+        'md:sticky md:top-0',
+        isMobile ? 'fixed top-0 left-0 right-0' : '',
+        isMobile && !shouldShowHeader ? '-translate-y-full' : 'translate-y-0'
+      )}
+    >
+      <div className="container mx-auto flex h-[72px] md:h-[80px] min-w-0 items-center justify-between gap-2 sm:gap-4 px-4">
         {/* Logo */}
-        <Link href="/" className="flex shrink-0 items-center" aria-label="Šipkoviště">
+        <Link href="/" className="flex h-full shrink-0 items-center" aria-label="Šipkoviště">
           <img
             src="/logo.svg"
             alt="Šipkoviště"
-            className="h-40 w-40 rounded-lg object-contain"
+            className="h-[27px] md:h-[50%] w-auto rounded-lg object-contain"
           />
         </Link>
 
@@ -149,19 +189,19 @@ export function Header() {
         </form>
 
         {/* Desktop Navigation – od lg breakpointu, aby se vešlo bez přetečení */}
-        <nav className="hidden lg:flex h-16 min-w-0 shrink-0 items-center gap-4 xl:gap-6">
+        <nav className="hidden lg:flex h-[80px] min-w-0 shrink-0 items-center gap-4 xl:gap-6">
           <Link href="/sell">
             <Button size="default" className="gap-2 rounded-md">
               <Plus className="h-4 w-4" />
               Prodat
             </Button>
           </Link>
-          <span className="h-16 w-0 border-l border-border shrink-0 self-stretch" aria-hidden />
+          <span className="h-[80px] w-0 border-l border-border shrink-0 self-stretch" aria-hidden />
           <Link href="/marketplace" className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:no-underline transition-colors">
             <Store className="h-5 w-5" />
             Tržiště
           </Link>
-          <span className="h-16 w-0 border-l border-border shrink-0 self-stretch" aria-hidden />
+          <span className="h-[80px] w-0 border-l border-border shrink-0 self-stretch" aria-hidden />
           {isLoggedIn && (
             <>
               <Link href="/messages" className="relative flex items-center gap-2 px-2 py-1.5 -mx-1 -my-0.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -175,7 +215,7 @@ export function Header() {
                 </span>
                 Moje zprávy
               </Link>
-              <span className="h-16 w-0 border-l border-border shrink-0 self-stretch" aria-hidden />
+              <span className="h-[80px] w-0 border-l border-border shrink-0 self-stretch" aria-hidden />
             </>
           )}
 
@@ -258,13 +298,19 @@ export function Header() {
         {/* Mobile Menu – do lg včetně */}
         <Sheet>
           <SheetTrigger asChild className="lg:hidden">
-            <Button variant="ghost" size="icon">
-              <Menu className="h-5 w-5" />
-            </Button>
+            <button
+              type="button"
+              className="flex h-8 w-8 shrink-0 flex-col items-end justify-center gap-1 rounded-lg mr-4"
+              aria-label="Otevřít menu"
+            >
+              <span className="h-0.5 w-[20px] rounded-full bg-foreground/90" />
+              <span className="h-0.5 w-[10px] rounded-full bg-foreground/90" />
+              <span className="h-0.5 w-[20px] rounded-full bg-foreground/90" />
+            </button>
           </SheetTrigger>
           <SheetContent 
             side="right" 
-            className="w-11/12 flex flex-col p-0"
+            className="w-[78%] max-w-[320px] flex flex-col p-0"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             {/* Header: profil / přihlášení – oddělený blok */}
@@ -456,6 +502,8 @@ export function Header() {
 
       {/* Auth Dialog */}
       <AuthDialog open={isAuthDialogOpen} onOpenChange={setIsAuthDialogOpen} />
-    </header>
+      </header>
+      {isMobile && !isProductDetail && <div className="h-[72px] md:hidden shrink-0" aria-hidden />}
+    </>
   )
 }

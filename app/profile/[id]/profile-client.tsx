@@ -208,15 +208,14 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
       <Header />
 
       <main className="container mx-auto px-4 sm:px-4 py-4 sm:py-6 pb-24 sm:pb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mb-4 gap-2 -ml-2"
+        <button
+          type="button"
           onClick={() => router.back()}
+          className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+          aria-label="Zpět"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Zpět
-        </Button>
+          <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
+        </button>
 
         {/* Profil – horní část */}
         <motion.div
@@ -386,7 +385,7 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
                             {product.price.toLocaleString('cs-CZ')} Kč
                           </p>
                           <Button variant="outline" size="sm" className="h-8 text-xs mt-3" asChild>
-                            <Link href={`/product/${product.id}`}>Zobrazit inzerát</Link>
+                            <Link href={`/product/${product.id}?from=${encodeURIComponent(`profile/${profile.id}`)}`}>Zobrazit inzerát</Link>
                           </Button>
                         </div>
                       </Card>
@@ -399,6 +398,7 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
                         onToggleFavorite={handleToggleFavorite}
                         isTogglingFavorite={togglingProductId === product.id}
                         favoriteCount={favoriteCounts[product.id] ?? 0}
+                        returnUrl={`/profile/${profile.id}`}
                       />
                     )
                   )}
@@ -459,7 +459,7 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
                         </p>
                         <div className="flex flex-col gap-2 mt-3">
                           <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
-                            <Link href={`/product/${item.product_id}`}>Zobrazit inzerát</Link>
+                            <Link href={`/product/${item.product_id}?from=${encodeURIComponent(`profile/${profile.id}`)}`}>Zobrazit inzerát</Link>
                           </Button>
                           <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
                             <Link href={item.buyer ? `/messages?to=${item.buyer.id}&product=${item.product_id}` : '/messages'}>Zprávy</Link>
@@ -532,7 +532,7 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
                           </p>
                           <div className="flex flex-col gap-2 mt-3">
                             <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
-                              <Link href={`/product/${item.product_id}`}>Zobrazit inzerát</Link>
+                              <Link href={`/product/${item.product_id}?from=${encodeURIComponent(`profile/${profile.id}`)}`}>Zobrazit inzerát</Link>
                             </Button>
                             <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
                               <Link href="/messages">Zprávy</Link>

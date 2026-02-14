@@ -257,6 +257,7 @@ export function HomeClient({ featuredProducts, categoryCounts, totalProducts, fa
                     isTogglingFavorite={togglingProductId === product.id}
                     favoriteCount={favoriteCounts[product.id] ?? 0}
                     priority={index === 0}
+                    returnUrl="/"
                   />
                 </div>
               ))}

@@ -4,7 +4,7 @@ import { incrementProductViewAction } from '@/lib/supabase/actions'
 import { defaultOgImage, defaultOgImageUrl } from '@/lib/site-config'
 import { ProductPageClient } from './product-page-client'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { ArrowLeft } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,8 +75,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 }
 
-export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ from?: string | string[] }> }) {
   const { id } = await params
+  const resolved = await searchParams
+  const from = typeof resolved.from === 'string' ? resolved.from : resolved.from?.[0]
   const [product, favoriteCounts] = await Promise.all([
     getProduct(id),
     getProductFavoriteCounts([id]),
@@ -88,8 +90,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Produkt nenalezen</h1>
           <p className="text-muted-foreground mb-4">Tento inzerát byl možná odstraněn</p>
-          <Link href="/marketplace">
-            <Button>Zpět na tržiště</Button>
+          <Link
+            href="/marketplace"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+            aria-label="Zpět"
+          >
+            <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
           </Link>
         </div>
       </div>
@@ -100,5 +106,5 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   incrementProductViewAction(id)
 
-  return <ProductPageClient product={product} favoriteCount={favoriteCount} />
+  return <ProductPageClient product={product} favoriteCount={favoriteCount} returnUrl={from} />
 }
