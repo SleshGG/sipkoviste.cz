@@ -277,12 +277,31 @@ export async function deleteProductAction(id: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Musíte být přihlášeni' }
 
-  const [messagesRes, salesRes] = await Promise.all([
-    supabase.from('messages').select('id').eq('product_id', id).limit(1),
-    supabase.from('confirmed_sales').select('id').eq('product_id', id).limit(1),
-  ])
-  if ((messagesRes.data?.length ?? 0) > 0 || (salesRes.data?.length ?? 0) > 0) {
-    return { error: 'Inzerát nelze smazat – má zprávy nebo byl prodán. Můžete ho skrýt z tržiště.' }
+  const { data: salesData } = await supabase
+    .from('confirmed_sales')
+    .select('id')
+    .eq('product_id', id)
+    .limit(1)
+  if ((salesData?.length ?? 0) > 0) {
+    return { error: 'Inzerát nelze smazat – byl prodán. Můžete ho skrýt z tržiště.' }
+  }
+
+  // Před smazáním uložíme název inzerátu do zpráv, aby v chatu zůstalo „Inzerát byl smazán“
+  const { data: productData } = await supabase
+    .from('products')
+    .select('name')
+    .eq('id', id)
+    .eq('seller_id', user.id)
+    .single()
+  if (productData?.name) {
+    await supabase
+      .from('messages')
+      .update({
+        product_id: null,
+        deleted_product_id: id,
+        deleted_product_name: productData.name,
+      })
+      .eq('product_id', id)
   }
 
   const { data: deleted, error } = await supabase
@@ -296,7 +315,7 @@ export async function deleteProductAction(id: string) {
   if (error) {
     const code = (error as { code?: string }).code
     if (code === '23503') {
-      return { error: 'Inzerát nelze smazat – má vazby (zprávy nebo recenze). V Supabase SQL Editor spusť jednou skript 009_cascade_product_delete.sql, poté bude mazání fungovat.' }
+      return { error: 'Inzerát nelze smazat – má vazby. V Supabase SQL Editor spusť skript 021_messages_deleted_product.sql.' }
     }
     return { error: error.message || 'Nepodařilo se smazat inzerát.' }
   }
@@ -314,7 +333,11 @@ export async function deleteProductAction(id: string) {
 
 // ============ MESSAGE ACTIONS ============
 
-export async function sendMessageAction(message: Omit<MessageInsert, 'sender_id'> & { product_id?: string | null }) {
+export async function sendMessageAction(message: Omit<MessageInsert, 'sender_id'> & {
+  product_id?: string | null
+  deleted_product_id?: string | null
+  deleted_product_name?: string | null
+}) {
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
@@ -327,13 +350,20 @@ export async function sendMessageAction(message: Omit<MessageInsert, 'sender_id'
   if (text.length > 5000) return { error: 'Zpráva je příliš dlouhá.' }
   if (!UUID_REGEX.test(message.receiver_id)) return { error: 'Neplatný příjemce.' }
   const productId = message.product_id ?? null
+  const deletedProductId = message.deleted_product_id ?? null
+  const deletedProductName = message.deleted_product_name ?? null
   if (productId !== null && !UUID_REGEX.test(productId)) return { error: 'Neplatný produkt.' }
+  if (deletedProductId !== null && !UUID_REGEX.test(deletedProductId)) return { error: 'Neplatný smazaný produkt.' }
 
-  const insertData = {
+  const insertData: Record<string, unknown> = {
     receiver_id: message.receiver_id,
     product_id: productId,
     text,
     sender_id: user.id,
+  }
+  if (deletedProductId && deletedProductName) {
+    insertData.deleted_product_id = deletedProductId
+    insertData.deleted_product_name = deletedProductName
   }
 
   const { data, error } = await supabase

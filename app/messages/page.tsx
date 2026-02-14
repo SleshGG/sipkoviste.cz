@@ -57,6 +57,7 @@ interface Conversation {
     name: string
     image: string | null
     seller_id?: string
+    deleted?: boolean
   } | null
   lastMessage: string
   timestamp: string
@@ -177,13 +178,19 @@ function MessagesContent() {
         const otherUser = msg.sender_id === user.id ? msg.receiver : msg.sender
         if (!otherUser) return
         const product = msg.product
-        const key = msg.product_id ? `${otherUserId}::${msg.product_id}` : `${otherUserId}::general`
-        
+        const convProductId = msg.product_id ?? msg.deleted_product_id ?? null
+        const key = convProductId ? `${otherUserId}::${convProductId}` : `${otherUserId}::general`
+        const productForConv = product
+          ? { id: product.id, name: product.name, image: product.image ?? null, seller_id: product.seller_id }
+          : msg.deleted_product_id && msg.deleted_product_name
+            ? { id: msg.deleted_product_id, name: msg.deleted_product_name, image: null, deleted: true as const }
+            : null
+
         if (!conversationsMap.has(key)) {
           conversationsMap.set(key, {
             id: key,
             participant: { id: otherUser.id, name: otherUser.name ?? null, avatar_url: otherUser.avatar_url ?? null, show_online_status: 'show_online_status' in otherUser ? otherUser.show_online_status : undefined, last_seen_at: 'last_seen_at' in otherUser ? otherUser.last_seen_at : undefined },
-            product: product ? { id: product.id, name: product.name, image: product.image ?? null, seller_id: product.seller_id } : null,
+            product: productForConv,
             lastMessage: msg.text,
             timestamp: msg.created_at,
             unread: !msg.is_read && msg.receiver_id === user.id
@@ -246,6 +253,7 @@ function MessagesContent() {
             .from('messages')
             .select('*')
             .is('product_id', null)
+            .is('deleted_product_id', null)
             .eq('sender_id', currentUserId)
             .eq('receiver_id', otherUserId)
             .order('created_at', { ascending: true }),
@@ -253,6 +261,7 @@ function MessagesContent() {
             .from('messages')
             .select('*')
             .is('product_id', null)
+            .is('deleted_product_id', null)
             .eq('sender_id', otherUserId)
             .eq('receiver_id', currentUserId)
             .order('created_at', { ascending: true }),
@@ -262,14 +271,14 @@ function MessagesContent() {
           supabase
             .from('messages')
             .select('*')
-            .eq('product_id', productId)
+            .or(`product_id.eq.${productId},deleted_product_id.eq.${productId}`)
             .eq('sender_id', currentUserId)
             .eq('receiver_id', otherUserId)
             .order('created_at', { ascending: true }),
           supabase
             .from('messages')
             .select('*')
-            .eq('product_id', productId)
+            .or(`product_id.eq.${productId},deleted_product_id.eq.${productId}`)
             .eq('sender_id', otherUserId)
             .eq('receiver_id', currentUserId)
             .order('created_at', { ascending: true }),
@@ -289,54 +298,60 @@ function MessagesContent() {
 
     fetchMessages()
 
-    // Subscribe to new messages and updates (nabídky – přijetí/odmítnutí)
-    const channel = supabase
-      .channel('messages')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: isGeneral ? 'product_id=is.null' : `product_id=eq.${productId}`,
-      }, (payload) => {
-        const newMsg = payload.new as Message
-        const inConversation = newMsg.sender_id === currentUserId
-          ? newMsg.receiver_id === otherUserId
-          : newMsg.sender_id === otherUserId
-        const isGeneralMsg = newMsg.product_id === null
-        if (inConversation && (isGeneral ? isGeneralMsg : newMsg.product_id === productId)) {
-          setMessages(prev => {
-            if (prev.some(m => m.id === newMsg.id)) return prev
-            return [...prev, newMsg]
+    const handleNewMessage = (newMsg: Message & { deleted_product_id?: string | null }) => {
+      const inConversation = newMsg.sender_id === currentUserId
+        ? newMsg.receiver_id === otherUserId
+        : newMsg.sender_id === otherUserId
+      const convProductId = newMsg.product_id ?? newMsg.deleted_product_id ?? null
+      const matchesConv = isGeneral
+        ? (newMsg.product_id === null && newMsg.deleted_product_id === null)
+        : (newMsg.product_id === productId || newMsg.deleted_product_id === productId)
+      if (inConversation && matchesConv) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev
+          return [...prev, newMsg]
+        })
+        const convKey = convProductId ? `${newMsg.sender_id === currentUserId ? newMsg.receiver_id : newMsg.sender_id}::${convProductId}` : `${newMsg.sender_id === currentUserId ? newMsg.receiver_id : newMsg.sender_id}::general`
+        setConversations(prev => prev.map(c =>
+          c.id === convKey
+            ? { ...c, lastMessage: newMsg.text, timestamp: newMsg.created_at, unread: newMsg.receiver_id === currentUserId }
+            : c
+        ))
+      }
+    }
+
+    const handleUpdatedMessage = (updatedMsg: Message & { deleted_product_id?: string | null }) => {
+      const inConversation = updatedMsg.sender_id === currentUserId
+        ? updatedMsg.receiver_id === otherUserId
+        : updatedMsg.sender_id === otherUserId
+      const matchesConv = isGeneral
+        ? (updatedMsg.product_id === null && updatedMsg.deleted_product_id === null)
+        : (updatedMsg.product_id === productId || updatedMsg.deleted_product_id === productId)
+      if (inConversation && matchesConv) {
+        setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m))
+        const prodId = updatedMsg.product_id ?? updatedMsg.deleted_product_id
+        if (updatedMsg.offer_status === 'accepted' && prodId && selectedConv?.product?.seller_id) {
+          getSaleStatusAction(prodId, otherUserId, selectedConv.product.seller_id).then((res) => {
+            if (!res.error) setSaleStatus({ confirmed: res.confirmed, canReview: res.canReview, alreadyReviewed: res.alreadyReviewed, productSoldToOther: res.productSoldToOther })
           })
-          const convKey = `${newMsg.sender_id === currentUserId ? newMsg.receiver_id : newMsg.sender_id}::${newMsg.product_id ?? 'general'}`
-          setConversations(prev => prev.map(c =>
-            c.id === convKey
-              ? { ...c, lastMessage: newMsg.text, timestamp: newMsg.created_at, unread: newMsg.receiver_id === currentUserId }
-              : c
-          ))
         }
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'messages',
-        filter: isGeneral ? 'product_id=is.null' : `product_id=eq.${productId}`,
-      }, (payload) => {
-        const updatedMsg = payload.new as Message
-        const inConversation = updatedMsg.sender_id === currentUserId
-          ? updatedMsg.receiver_id === otherUserId
-          : updatedMsg.sender_id === otherUserId
-        const isGeneralMsg = updatedMsg.product_id === null
-        if (inConversation && (isGeneral ? isGeneralMsg : updatedMsg.product_id === productId)) {
-          setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m))
-          if (updatedMsg.offer_status === 'accepted' && updatedMsg.product_id && selectedConv?.product?.seller_id) {
-            getSaleStatusAction(updatedMsg.product_id, otherUserId, selectedConv.product.seller_id).then((res) => {
-              if (!res.error) setSaleStatus({ confirmed: res.confirmed, canReview: res.canReview, alreadyReviewed: res.alreadyReviewed, productSoldToOther: res.productSoldToOther })
-            })
-          }
-        }
-      })
-      .subscribe()
+      }
+    }
+
+    // Subscribe to new messages and updates (nabídky – přijetí/odmítnutí)
+    const channel = supabase.channel('messages')
+    if (isGeneral) {
+      channel
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'product_id=is.null' }, (p) => handleNewMessage(p.new as Message & { deleted_product_id?: string | null }))
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: 'product_id=is.null' }, (p) => handleUpdatedMessage(p.new as Message & { deleted_product_id?: string | null }))
+    } else {
+      channel
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `product_id=eq.${productId}` }, (p) => handleNewMessage(p.new as Message & { deleted_product_id?: string | null }))
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `product_id=eq.${productId}` }, (p) => handleUpdatedMessage(p.new as Message & { deleted_product_id?: string | null }))
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `deleted_product_id=eq.${productId}` }, (p) => handleNewMessage(p.new as Message & { deleted_product_id?: string | null }))
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `deleted_product_id=eq.${productId}` }, (p) => handleUpdatedMessage(p.new as Message & { deleted_product_id?: string | null }))
+    }
+    channel.subscribe()
 
     return () => {
       supabase.removeChannel(channel)
@@ -450,10 +465,14 @@ function MessagesContent() {
     setIsSending(true)
     const [otherUserId, productId] = selectedConversation!.split('::')
     const isGeneral = productId === 'general'
+    const isDeletedProduct = selectedConv.product?.deleted
 
     const result = await sendMessageAction({
       receiver_id: otherUserId,
-      product_id: isGeneral ? null : productId,
+      product_id: isGeneral || isDeletedProduct ? null : productId,
+      ...(isDeletedProduct && selectedConv.product
+        ? { deleted_product_id: productId, deleted_product_name: selectedConv.product.name }
+        : {}),
       text: newMessage.trim(),
     })
 
@@ -580,7 +599,7 @@ function MessagesContent() {
                               </span>
                             </div>
                             <p className="text-[10px] sm:text-xs text-primary/80 truncate mt-0.5">
-                              {conv.product?.name ?? 'Obecná konverzace'}
+                              {conv.product?.deleted ? 'Inzerát byl smazán' : (conv.product?.name ?? 'Obecná konverzace')}
                             </p>
                             <p
                               className={`text-xs sm:text-sm truncate mt-1 ${conv.unread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}
@@ -627,10 +646,10 @@ function MessagesContent() {
                             {selectedConv.participant.name || 'Uživatel'}
                           </h3>
                           <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                            {selectedConv.product?.name ?? 'Obecná konverzace'}
+                            {selectedConv.product?.deleted ? 'Inzerát byl smazán' : (selectedConv.product?.name ?? 'Obecná konverzace')}
                           </p>
                         </div>
-                        {selectedConv.product && (
+                        {selectedConv.product && !selectedConv.product.deleted && (
                           <Link href={`/product/${selectedConv.product.id}`} className="shrink-0 hidden xs:block">
                             <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-lg overflow-hidden bg-secondary border border-border hover:border-primary transition-colors">
                               {selectedConv.product.image && (
@@ -665,7 +684,7 @@ function MessagesContent() {
                     </div>
 
                     {/* Potvrzení prodeje (jen prodejce) a hodnocení (oba účastníci) */}
-                    {selectedConv.product?.seller_id && saleStatus && (
+                    {selectedConv.product?.seller_id && !selectedConv.product?.deleted && saleStatus && (
                       <div className="px-3 sm:px-4 py-2 border-b border-border bg-muted/30 flex flex-wrap items-center gap-2">
                         {saleStatus.productSoldToOther && currentUserId === selectedConv.product.seller_id && (
                           <span className="text-sm text-muted-foreground">
@@ -808,7 +827,7 @@ function MessagesContent() {
                     </div>
 
                     {/* Dialog pro hodnocení druhého účastníka (jen u konverzací o inzerátu) */}
-                    <Dialog open={reviewDialogOpen && !!selectedConv?.product} onOpenChange={setReviewDialogOpen}>
+                    <Dialog open={reviewDialogOpen && !!selectedConv?.product && !selectedConv?.product?.deleted} onOpenChange={setReviewDialogOpen}>
                       <DialogContent className="sm:max-w-md">
                         <DialogHeader>
                           <DialogTitle>

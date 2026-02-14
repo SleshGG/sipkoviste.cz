@@ -327,22 +327,21 @@ export async function deleteProduct(id: string): Promise<boolean> {
   return true
 }
 
-/** Vrátí ID produktů, které lze smazat (nemají zprávy ani confirmed_sales). */
+/** Vrátí ID produktů, které lze smazat (nebyly prodány – confirmed_sales). */
 export async function getProductIdsCanDelete(productIds: string[]): Promise<Set<string>> {
   if (productIds.length === 0) return new Set()
   const supabase = await createClient()
 
-  const [messagesRes, salesRes] = await Promise.all([
-    supabase.from('messages').select('product_id').in('product_id', productIds),
-    supabase.from('confirmed_sales').select('product_id').in('product_id', productIds),
-  ])
+  const { data: salesData } = await supabase
+    .from('confirmed_sales')
+    .select('product_id')
+    .in('product_id', productIds)
 
-  const hasMessages = new Set((messagesRes.data ?? []).map((r) => r.product_id))
-  const hasSales = new Set((salesRes.data ?? []).map((r) => r.product_id))
+  const hasSales = new Set((salesData ?? []).map((r) => r.product_id))
 
   const canDelete = new Set<string>()
   for (const id of productIds) {
-    if (!hasMessages.has(id) && !hasSales.has(id)) canDelete.add(id)
+    if (!hasSales.has(id)) canDelete.add(id)
   }
   return canDelete
 }

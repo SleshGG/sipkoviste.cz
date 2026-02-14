@@ -41,6 +41,8 @@ export interface Message {
   sender_id: string
   receiver_id: string
   product_id: string | null
+  deleted_product_id?: string | null
+  deleted_product_name?: string | null
   text: string
   is_read: boolean
   message_type?: MessageType
@@ -52,6 +54,8 @@ export interface Message {
 /** Zpráva s vnořenými profily a produktem (výstup z Supabase select s joinem) */
 export interface MessageWithRelations extends Omit<Message, 'product_id'> {
   product_id: string | null
+  deleted_product_id?: string | null
+  deleted_product_name?: string | null
   sender: Pick<Profile, 'id' | 'name' | 'avatar_url'>
   receiver: Pick<Profile, 'id' | 'name' | 'avatar_url'>
   product: Pick<Product, 'id' | 'name' | 'image' | 'seller_id'> | null
