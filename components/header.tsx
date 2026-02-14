@@ -310,11 +310,11 @@ export function Header() {
           </SheetTrigger>
           <SheetContent 
             side="right" 
-            className="w-[78%] max-w-[320px] flex flex-col p-0"
+            className="w-[90%] max-w-[380px] flex flex-col p-0"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
-            {/* Header: profil / přihlášení – oddělený blok */}
-            <div className="shrink-0 border-b border-border bg-muted/30 px-4 py-5">
+            {/* Header: profil / přihlášení – oddělený blok (pr-14 = místo pro ikonu zavřít) */}
+            <div className="shrink-0 border-b border-border bg-muted/30 px-4 pr-14 py-5">
               {isLoggedIn ? (
                 <div className="flex items-center gap-4">
                   <div className="overflow-visible shrink-0">

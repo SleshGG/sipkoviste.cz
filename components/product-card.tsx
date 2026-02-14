@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Card } from '@/components/ui/card'
@@ -28,7 +29,7 @@ interface ProductCardProps {
   returnUrl?: string
 }
 
-export function ProductCard({ product, index = 0, showFavorite, isFavorite, onToggleFavorite, isTogglingFavorite, favoriteCount = 0, priority, showViewCount, viewCount = 0, returnUrl }: ProductCardProps) {
+function ProductCardInner({ product, index = 0, showFavorite, isFavorite, onToggleFavorite, isTogglingFavorite, favoriteCount = 0, priority, showViewCount, viewCount = 0, returnUrl }: ProductCardProps) {
   const fromParam = returnUrl === '/' ? '.' : (returnUrl?.replace(/^\//, '') ?? '')
   const productHref = returnUrl
     ? `/product/${product.id}?from=${encodeURIComponent(fromParam)}`
@@ -37,7 +38,7 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
+      transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.3) }}
     >
       <Link href={productHref}>
         <Card className={`group overflow-hidden border-border bg-card transition-all duration-300 py-0 h-full flex flex-col gap-3 ${
@@ -139,3 +140,5 @@ export function ProductCard({ product, index = 0, showFavorite, isFavorite, onTo
     </motion.div>
   )
 }
+
+export const ProductCard = memo(ProductCardInner)

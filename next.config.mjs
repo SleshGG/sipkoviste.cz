@@ -21,6 +21,7 @@ const nextConfig = {
       },
     ]
   },
+  poweredByHeader: false,
   images: {
     remotePatterns: [
       {

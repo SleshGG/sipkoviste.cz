@@ -5,7 +5,7 @@ import { LastSeenUpdater } from '@/components/last-seen-updater'
 import { defaultOgImage, defaultOgImageUrl } from '@/lib/site-config'
 import './globals.css'
 
-const geistSans = Geist({ subsets: ['latin'] })
+const geistSans = Geist({ subsets: ['latin'], display: 'swap' })
 
 const siteName = 'Šipkoviště'
 const defaultDescription = 'Kupujte a prodávejte prémiové šipky, terče a příslušenství. Největší tržiště pro milovníky šipek v ČR.'
@@ -47,11 +47,11 @@ export default function RootLayout({
   const fbAppId = process.env.NEXT_PUBLIC_FB_APP_ID
 
   return (
-    <html lang="cs">
+    <html lang="cs" suppressHydrationWarning>
       <head>
         {fbAppId && <meta property="fb:app_id" content={fbAppId} />}
       </head>
-      <body className={`${geistSans.className} antialiased`}>
+      <body className={`${geistSans.className} antialiased`} suppressHydrationWarning>
         {children}
         <LastSeenUpdater />
         <CookieConsentBar />

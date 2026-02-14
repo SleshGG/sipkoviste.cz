@@ -99,6 +99,7 @@ export function ProductPageClient({ product, favoriteCount = 0, returnUrl: retur
   const [offerAmount, setOfferAmount] = useState('')
   const touchStartX = useRef<number | null>(null)
   const didSwipe = useRef(false)
+  const slideDirection = useRef<number>(0)
 
   useEffect(() => {
     const supabase = createClient()
@@ -223,7 +224,7 @@ export function ProductPageClient({ product, favoriteCount = 0, returnUrl: retur
       <div className="min-h-screen md:min-h-0 bg-background pb-20 md:pb-0">
       <main className="md:container md:mx-auto md:px-4 md:py-6">
         {/* Mobil: fotka 4:3, 100% šířka pod headerem, tlačítko zpět ve fotce */}
-        <div className="md:hidden relative w-full h-[55vh] bg-secondary -mt-px overflow-hidden">
+        <div className="md:hidden relative w-full h-[62vh] bg-secondary -mt-px overflow-hidden">
           <a
             href={backHref}
             className="absolute left-3 top-3 z-40 h-10 w-10 min-w-10 min-h-10 rounded-lg border border-border bg-secondary flex items-center justify-center text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
@@ -231,14 +232,15 @@ export function ProductPageClient({ product, favoriteCount = 0, returnUrl: retur
           >
             <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
           </a>
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="sync" custom={slideDirection.current}>
             <motion.div
               key={selectedImageIndex}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="relative w-full h-full cursor-pointer touch-pan-y"
+              custom={slideDirection.current}
+              initial={(d) => (d === 0 ? {} : { x: d > 0 ? '-100%' : '100%', opacity: 0.9 })}
+              animate={{ x: 0, opacity: 1 }}
+              exit={(d) => (d === 0 ? { opacity: 0 } : { x: d > 0 ? '100%' : '-100%', opacity: 0.9 })}
+              transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              className="absolute inset-0 cursor-pointer touch-pan-y"
               role="button"
               tabIndex={0}
               onTouchStart={(e) => {
@@ -251,6 +253,7 @@ export function ProductPageClient({ product, favoriteCount = 0, returnUrl: retur
                 touchStartX.current = null
                 if (Math.abs(deltaX) < 50) return
                 didSwipe.current = true
+                slideDirection.current = deltaX > 0 ? 1 : -1
                 setSelectedImageIndex((prev) =>
                   deltaX > 0 ? (prev - 1 + images.length) % images.length : (prev + 1) % images.length
                 )
@@ -288,6 +291,7 @@ export function ProductPageClient({ product, favoriteCount = 0, returnUrl: retur
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
+                    slideDirection.current = i > selectedImageIndex ? -1 : 1
                     setSelectedImageIndex(i)
                   }}
                   className={`h-2 w-2 rounded-full transition-colors ${

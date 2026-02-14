@@ -21,8 +21,8 @@ export function CookieConsentBar() {
     setConsent(true)
   }
 
-  // Neukazovat nic pred hydrataci, pak neukazovat bar pri souhlasu
-  if (consent === null) return null
+  // Vždy renderovat wrapper kvůli stabilnímu DOM (prevence removeChild chyby)
+  if (consent === null) return <div suppressHydrationWarning aria-hidden />
   if (consent === true) return <Analytics />
 
   return (
