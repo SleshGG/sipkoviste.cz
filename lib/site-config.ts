@@ -16,6 +16,6 @@ export const defaultOgImage = {
   secureUrl: defaultOgImageUrl.startsWith('https') ? defaultOgImageUrl : undefined,
   width: 1200,
   height: 630,
-  alt: 'Šipkoviště.cz',
+  alt: 'Šipkoviště',
   type: 'image/png' as const,
 }

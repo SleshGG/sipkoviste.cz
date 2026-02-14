@@ -7,7 +7,7 @@ import './globals.css'
 
 const geistSans = Geist({ subsets: ['latin'] })
 
-const siteName = 'Šipkoviště.cz'
+const siteName = 'Šipkoviště'
 const defaultDescription = 'Kupujte a prodávejte prémiové šipky, terče a příslušenství. Největší tržiště pro milovníky šipek v ČR.'
 
 const baseUrl =

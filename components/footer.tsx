@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { Target } from 'lucide-react'
 
 export function Footer() {
   return (
@@ -8,11 +7,12 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           {/* Mobil: logo → práva → odkazy pod sebou; desktop: logo+práva vlevo, odkazy vpravo */}
           <div className="flex flex-col md:flex-row items-center gap-2 md:gap-2 text-center md:text-left w-full md:w-auto">
-            <div className="flex items-center justify-center md:justify-start gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                <Target className="h-4 w-4 text-primary-foreground" />
-              </div>
-              <span className="font-bold">Šipkoviště.cz</span>
+            <div className="flex items-center justify-center md:justify-start">
+              <img
+                src="/logo.svg"
+                alt="Šipkoviště"
+                className="h-20 w-20 rounded-lg object-contain shrink-0"
+              />
             </div>
             <span className="text-muted-foreground text-sm">
               2026 Všechna práva vyhrazena

@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Target, Search, Plus, MessageCircle, User, Menu, Settings, LogOut, Loader2, ChevronDown, Store, Heart, FileText, HelpCircle, Cookie } from 'lucide-react'
+import { Search, Plus, MessageCircle, User, Menu, Settings, LogOut, Loader2, ChevronDown, Store, Heart, FileText, HelpCircle, Cookie } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
@@ -127,11 +127,12 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 min-w-0 items-center justify-between gap-2 sm:gap-4 px-4">
         {/* Logo */}
-        <Link href="/" className="flex shrink-0 items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <Target className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">Šipkoviště.cz</span>
+        <Link href="/" className="flex shrink-0 items-center" aria-label="Šipkoviště">
+          <img
+            src="/logo.svg"
+            alt="Šipkoviště"
+            className="h-40 w-40 rounded-lg object-contain"
+          />
         </Link>
 
         {/* Search Bar - Hidden on mobile */}
@@ -206,6 +207,12 @@ export function Header() {
                   <Link href="/profile/me" className="flex items-center gap-2 cursor-pointer">
                     <User className="h-4 w-4" />
                     Můj profil
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="text-muted-foreground focus:bg-transparent focus:text-foreground hover:bg-transparent hover:text-foreground">
+                  <Link href="/marketplace/oblibene" className="flex items-center gap-2 cursor-pointer">
+                    <Heart className="h-4 w-4" />
+                    Oblíbené
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="text-muted-foreground focus:bg-transparent focus:text-foreground hover:bg-transparent hover:text-foreground">

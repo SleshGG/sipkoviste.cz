@@ -13,7 +13,7 @@ const HomeClient = dynamic(() => import('./home-client').then((m) => m.HomeClien
 /** Cache stránky 60 s – zlepší TTFB při opakovaných návštěvách */
 export const revalidate = 60
 
-const siteName = 'Šipkoviště.cz'
+const siteName = 'Šipkoviště'
 const defaultDescription = 'Kupujte a prodávejte prémiové šipky, terče a příslušenství. Největší tržiště pro milovníky šipek v ČR.'
 
 export const metadata: Metadata = {
