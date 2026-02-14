@@ -17,7 +17,7 @@ export default function CookiesPage() {
       <main className="container mx-auto px-4 py-8 max-w-3xl">
         <Link
           href="/"
-          className="mb-6 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+          className="relative z-40 mb-6 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
           aria-label="Zpět na úvod"
         >
           <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />

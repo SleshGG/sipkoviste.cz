@@ -290,7 +290,7 @@ export default function EditListingPage() {
           <p className="text-muted-foreground mb-4">Nemáte oprávnění ho upravit, nebo byl smazán.</p>
           <Link
             href="/dashboard"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+            className="relative z-40 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
             aria-label="Zpět na nástěnku"
           >
             <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
@@ -308,7 +308,7 @@ export default function EditListingPage() {
       <main className="container mx-auto px-4 py-6 max-w-2xl">
         <Link
           href="/dashboard"
-          className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+          className="relative z-40 mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
           aria-label="Zpět na nástěnku"
         >
           <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />

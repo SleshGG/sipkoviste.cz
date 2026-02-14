@@ -226,7 +226,7 @@ export function ProductPageClient({ product, favoriteCount = 0, returnUrl: retur
         <div className="md:hidden relative w-full h-[55vh] bg-secondary -mt-px overflow-hidden">
           <a
             href={backHref}
-            className="absolute left-3 top-3 z-[60] h-10 w-10 min-w-10 min-h-10 rounded-lg border border-border bg-secondary flex items-center justify-center text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+            className="absolute left-3 top-3 z-40 h-10 w-10 min-w-10 min-h-10 rounded-lg border border-border bg-secondary flex items-center justify-center text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
             aria-label="Zpět"
           >
             <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
@@ -310,7 +310,7 @@ export function ProductPageClient({ product, favoriteCount = 0, returnUrl: retur
             >
               <a
                 href={backHref}
-                className="relative z-[60] inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors mb-3 sm:mb-4"
+                className="relative z-40 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors mb-3 sm:mb-4"
                 aria-label="Zpět"
               >
                 <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />

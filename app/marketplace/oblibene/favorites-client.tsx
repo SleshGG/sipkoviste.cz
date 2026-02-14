@@ -43,7 +43,7 @@ export function FavoritesClient({ products, favoriteIds, favoriteCounts }: Favor
         <div className="flex items-center gap-4 mb-6">
           <Link
             href="/marketplace"
-            className="relative z-[60] inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+            className="relative z-40 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
             aria-label="Zpět"
           >
             <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />

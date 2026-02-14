@@ -92,7 +92,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <p className="text-muted-foreground mb-4">Tento inzerát byl možná odstraněn</p>
           <Link
             href="/marketplace"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+            className="relative z-40 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
             aria-label="Zpět"
           >
             <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />

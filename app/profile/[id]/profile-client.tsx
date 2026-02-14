@@ -211,7 +211,7 @@ export function ProfileClient({ profile, products, soldItems, reviews, purchased
         <button
           type="button"
           onClick={() => router.back()}
-          className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
+          className="relative z-40 mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground transition-colors"
           aria-label="Zpět"
         >
           <ArrowLeft className="size-5 shrink-0" strokeWidth={2} />
