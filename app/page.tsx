@@ -17,17 +17,17 @@ const siteName = 'Šipkoviště'
 const defaultDescription = 'Kupujte a prodávejte prémiové šipky, terče a příslušenství. Největší tržiště pro milovníky šipek v ČR.'
 
 export const metadata: Metadata = {
-  title: `${siteName} - Tržiště s Šipkami`,
+  title: `${siteName} - Tržiště s šipkami a příslušenstvím`,
   description: defaultDescription,
   openGraph: {
     type: 'website',
-    title: `${siteName} - Tržiště s Šipkami`,
+    title: `${siteName} - Tržiště s šipkami a příslušenstvím`,
     description: defaultDescription,
     images: [defaultOgImage],
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${siteName} - Tržiště s Šipkami`,
+    title: `${siteName} - Tržiště s šipkami a příslušenstvím`,
     description: defaultDescription,
     images: [defaultOgImageUrl],
   },

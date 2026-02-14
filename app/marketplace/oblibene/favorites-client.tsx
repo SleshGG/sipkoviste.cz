@@ -62,7 +62,7 @@ export function FavoritesClient({ products, favoriteIds, favoriteCounts }: Favor
         </div>
 
         {products.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {products.map((product, index) => (
               <ProductCard
                 key={product.id}

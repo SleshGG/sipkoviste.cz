@@ -16,20 +16,20 @@ const baseUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
-  title: { default: `${siteName} - Tržiště s Šipkami`, template: `%s | ${siteName}` },
+  title: { default: `${siteName} - Tržiště s šipkami a příslušenstvím`, template: `%s | ${siteName}` },
   description: defaultDescription,
   openGraph: {
     type: 'website',
     locale: 'cs_CZ',
     siteName,
-    title: `${siteName} - Tržiště s Šipkami`,
+    title: `${siteName} - Tržiště s šipkami a příslušenstvím`,
     description: defaultDescription,
     url: baseUrl,
     images: [defaultOgImage],
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${siteName} - Tržiště s Šipkami`,
+    title: `${siteName} - Tržiště s šipkami a příslušenstvím`,
     description: defaultDescription,
     images: [defaultOgImageUrl],
   },
