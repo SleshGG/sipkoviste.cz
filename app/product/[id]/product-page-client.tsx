@@ -239,7 +239,7 @@ export function ProductPageClient({ product, favoriteCount = 0, returnUrl: retur
               initial={(d) => (d === 0 ? {} : { x: d > 0 ? '-100%' : '100%', opacity: 0.9 })}
               animate={{ x: 0, opacity: 1 }}
               exit={(d) => (d === 0 ? { opacity: 0 } : { x: d > 0 ? '100%' : '-100%', opacity: 0.9 })}
-              transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
               className="absolute inset-0 cursor-pointer touch-pan-y"
               role="button"
               tabIndex={0}
