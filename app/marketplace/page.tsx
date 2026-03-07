@@ -1,0 +1,46 @@
+import nextDynamic from 'next/dynamic'
+import { Suspense } from 'react'
+import type { Metadata } from 'next'
+import { getProducts, getProductFavoriteCounts } from '@/lib/supabase/database'
+import type { ProductWithSeller } from '@/lib/supabase/types'
+import { defaultOgImage } from '@/lib/site-config'
+
+export const metadata: Metadata = {
+  title: 'Tržiště',
+  description: 'Prohlížejte inzeráty šipek, terčů a příslušenství. Filtrujte podle kategorie, značky a ceny.',
+  openGraph: {
+    title: 'Tržiště | Šipkoviště.cz',
+    description: 'Prohlížejte inzeráty šipek, terčů a příslušenství.',
+    images: [defaultOgImage],
+  },
+  twitter: { card: 'summary_large_image', images: [defaultOgImage.url] },
+}
+
+/** ISR – cache 60 s, revalidatePath při změně produktů */
+export const revalidate = 60
+
+const MarketplaceClient = nextDynamic(() => import('./marketplace-client').then((m) => m.MarketplaceClient), {
+  loading: () => <div className="min-h-screen bg-background flex items-center justify-center" aria-hidden="true" />,
+  ssr: true,
+})
+
+async function getMarketplaceProducts(): Promise<ProductWithSeller[]> {
+  try {
+    const products = await getProducts()
+    return products
+  } catch (error) {
+    console.error('Error fetching products:', error)
+    return []
+  }
+}
+
+export default async function MarketplacePage() {
+  const products = await getMarketplaceProducts()
+  const favoriteCounts = products.length > 0 ? await getProductFavoriteCounts(products.map((p) => p.id)) : {}
+
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <MarketplaceClient initialProducts={products} favoriteCounts={favoriteCounts} />
+    </Suspense>
+  )
+}

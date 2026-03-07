@@ -1,0 +1,9 @@
+# Snizeni pametove zataze Cursor - vylouceni velkych slozek z indexace
+# Prevence OOM (Out Of Memory) chyb
+
+node_modules/
+.next/
+.git/
+*.log
+*.lock
+.env*.local
